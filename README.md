@@ -69,16 +69,14 @@ bun run test     # Run tests
 bun run preview  # Preview production build
 ```
 
-### Self-hosting
+### Running your own instance
 
-This runs entirely on Cloudflare's free tier. You'll need:
+This project was built for my own Cloudflare setup, so it isn’t packaged as a one-command deploy.
 
-- A [Cloudflare](https://cloudflare.com) account
-- A [Resend](https://resend.com) account for magic link emails
-- `wrangler` CLI for deployment
+If you want to run it yourself, you’ll need:
 
-```bash
-bun run deploy
-```
+- a [Cloudflare](https://cloudflare.com) account with Pages and D1
+- a [Resend](https://resend.com) account for magic link emails
+- enough familiarity to wire the environment variables and deployment settings to your setup
 
-The architecture is general enough that anyone can deploy their own instance and use it for their household.
+The code is straightforward to adapt, but this README stays focused on the app itself rather than deployment documentation.
