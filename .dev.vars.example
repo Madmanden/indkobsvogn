@@ -1,0 +1,3 @@
+FROM_EMAIL=noreply@mail.example.com
+ALLOWED_EMAILS=allowed1@example.com,allowed2@example.com
+RESEND_API_KEY=
