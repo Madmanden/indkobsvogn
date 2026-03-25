@@ -33,6 +33,12 @@ Login via magic links — no passwords. Everyone in the household shares the sam
 **Per-store loyalty cards**  
 Save your Coop card to Coop, your Lidl card to Lidl. They appear automatically when you're in the right store.
 
+## Screenshots
+
+| Store | Settings | Planning |
+|---|---|---|
+| ![Store screen](screenshots/1_indkob_store.jpg) | ![Settings screen](screenshots/2_indkob_settings.jpg) | ![Planning screen](screenshots/3_indkob_planning.jpg) |
+
 ---
 
 ## Stack
