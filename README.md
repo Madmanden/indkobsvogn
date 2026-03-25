@@ -59,7 +59,7 @@ bun install
 bun run dev
 ```
 
-Open `http://localhost:8788`.
+Open the local URL shown in the terminal.
 
 Copy `.env.example` to `.env` and `.dev.vars.example` to `.dev.vars`. The latter requires a [Resend](https://resend.com) API key for local magic link delivery.
 
@@ -69,7 +69,7 @@ bun run test     # Run tests
 bun run preview  # Preview production build
 ```
 
-### Running your own instance
+### Optional: running your own instance
 
 This project was built for my own Cloudflare setup, so it isn’t packaged as a one-command deploy.
 
