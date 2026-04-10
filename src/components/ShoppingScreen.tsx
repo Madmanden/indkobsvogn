@@ -139,7 +139,7 @@ export function ShoppingScreen({
     <section className="shopping-screen">
       <header className="header-block with-divider">
         <div className="header-top">
-          <button type="button" className="btn-back" onClick={onEndShopping}>
+          <button type="button" className="btn-back" onClick={onCancelTrip}>
             Afslut
           </button>
           {selectedStore.loyaltyCardImage ? (
@@ -238,9 +238,6 @@ export function ShoppingScreen({
         </div>
         <button type="button" className="btn-primary" onClick={onEndShopping}>
           Afslut indkøb
-        </button>
-        <button type="button" className="btn-secondary" onClick={onCancelTrip}>
-          Annuller tur
         </button>
       </footer>
     </section>
