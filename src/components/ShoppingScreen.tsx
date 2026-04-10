@@ -9,6 +9,7 @@ interface Props {
   commit: (next: AppState) => void
   selectedStore: GroceryStore
   onEndShopping: () => void
+  onCancelTrip: () => void
   onShowLoyalty: () => void
 }
 
@@ -17,6 +18,7 @@ export function ShoppingScreen({
   commit,
   selectedStore,
   onEndShopping,
+  onCancelTrip,
   onShowLoyalty,
 }: Props) {
   const [addInput, setAddInput] = useState('')
@@ -137,7 +139,7 @@ export function ShoppingScreen({
     <section className="shopping-screen">
       <header className="header-block with-divider">
         <div className="header-top">
-          <button type="button" className="btn-back" onClick={onEndShopping}>
+          <button type="button" className="btn-back" onClick={onCancelTrip}>
             Afslut
           </button>
           {selectedStore.loyaltyCardImage ? (

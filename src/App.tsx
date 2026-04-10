@@ -3,7 +3,7 @@ import './App.css'
 import { useAppState } from './hooks/useAppState'
 import { mergeImportedState } from './utils/importExport'
 import { createInitialState } from './domain/default-state'
-import { completeTrip } from './domain/app-state'
+import { cancelTrip, completeTrip } from './domain/app-state'
 import { appStore } from './domain/store'
 import { StoresScreen } from './components/StoresScreen'
 import { PlanningScreen } from './components/PlanningScreen'
@@ -147,6 +147,11 @@ function App() {
       currentSequence: [],
     })
     setScreen('shopping')
+  }
+
+  function cancelCurrentTrip(): void {
+    commit(cancelTrip(appState))
+    setScreen('planning')
   }
 
   function endTrip(): void {
@@ -299,6 +304,7 @@ function App() {
               commit={commit}
               selectedStore={selectedStore}
               onEndShopping={() => setScreen('confirm')}
+              onCancelTrip={cancelCurrentTrip}
               onShowLoyalty={() => openLoyalty('shopping')}
             />
           </ErrorBoundary>
