@@ -26,6 +26,14 @@ export function persistWeightedPositions(state: AppState, now = Date.now()): App
   }
 }
 
+export function cancelTrip(state: AppState): AppState {
+  return {
+    ...state,
+    isShopping: false,
+    currentSequence: [],
+  }
+}
+
 export function completeTrip(state: AppState, now = Date.now()): AppState {
   const trips =
     state.currentSequence.length > 0
