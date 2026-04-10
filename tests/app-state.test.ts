@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { completeTrip, persistWeightedPositions } from '../src/domain/app-state'
+import { cancelTrip, completeTrip, persistWeightedPositions } from '../src/domain/app-state'
 import type { AppState, Trip } from '../src/domain/models'
 
 function makeState(trips: Trip[] = []): AppState {
@@ -69,6 +69,20 @@ describe('persistWeightedPositions', () => {
     // With formula index/(length-1), a 2-item trip gives [0, 1]
     expect(persisted.list[0]?.weightedPosition).toBe(0)
     expect(persisted.list[1]?.weightedPosition).toBe(1)
+  })
+})
+
+describe('cancelTrip', () => {
+  it('resets isShopping and currentSequence without touching the list or trips', () => {
+    const state = makeState([
+      { id: 'trip-1', storeId: 'store-1', completedAt: 1000, sequence: ['item-a'] },
+    ])
+    const cancelled = cancelTrip(state)
+
+    expect(cancelled.isShopping).toBe(false)
+    expect(cancelled.currentSequence).toEqual([])
+    expect(cancelled.list).toEqual(state.list)
+    expect(cancelled.trips).toEqual(state.trips)
   })
 })
 
