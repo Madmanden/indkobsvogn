@@ -9,6 +9,7 @@ import type { AppState, GroceryStore, Item, ListItem } from '../domain/models'
 import { getPlanningRows } from '../utils/list'
 import { normalizeItemName, similarity } from '../utils/fuzzy'
 import { createId } from '../utils/id'
+import { getLearnedPosition } from '../domain/learning'
 
 interface UndoState {
   listItem: ListItem
@@ -160,7 +161,11 @@ export function PlanningScreen({
             storeId: appState.selectedStoreId,
             quantity: match.defaultQuantity,
             addedAt: now,
-            weightedPosition: 1,
+            weightedPosition: getLearnedPosition(
+              match.id,
+              appState.trips.filter((t) => t.storeId === appState.selectedStoreId),
+              now,
+            ),
           },
         ]
 

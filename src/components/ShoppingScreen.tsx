@@ -140,7 +140,7 @@ export function ShoppingScreen({
       <header className="header-block with-divider">
         <div className="header-top">
           <button type="button" className="btn-back" onClick={onCancelTrip}>
-            Afslut
+            Annuller
           </button>
           {selectedStore.loyaltyCardImage ? (
             <button

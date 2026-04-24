@@ -14,33 +14,37 @@ function calculateNormalizedIndex(index: number, tripLength: number): number {
   return index / (tripLength - 1)
 }
 
+export function getLearnedPosition(
+  itemId: string,
+  trips: Trip[],
+  now = Date.now(),
+  lambda = 0.05,
+): number {
+  let weightedTotal = 0
+  let weightSum = 0
+
+  for (const trip of trips) {
+    const index = trip.sequence.indexOf(itemId)
+    if (index < 0) continue
+
+    const normalizedIndex = calculateNormalizedIndex(index, trip.sequence.length)
+    const weight = calculateTripWeight(trip.completedAt, now, lambda)
+
+    weightedTotal += normalizedIndex * weight
+    weightSum += weight
+  }
+
+  return weightSum > 0 ? weightedTotal / weightSum : DEFAULT_WEIGHTED_POSITION
+}
+
 export function recalculateWeightedPositions(
   list: ListItem[],
   trips: Trip[],
   now = Date.now(),
   lambda = 0.05,
 ): ListItem[] {
-  return list.map((listItem) => {
-    let weightedTotal = 0
-    let weightSum = 0
-
-    for (const trip of trips) {
-      const index = trip.sequence.indexOf(listItem.itemId)
-      if (index < 0) continue
-
-      const normalizedIndex = calculateNormalizedIndex(index, trip.sequence.length)
-      const weight = calculateTripWeight(trip.completedAt, now, lambda)
-
-      weightedTotal += normalizedIndex * weight
-      weightSum += weight
-    }
-
-    const weightedPosition =
-      weightSum > 0 ? weightedTotal / weightSum : DEFAULT_WEIGHTED_POSITION
-
-    return {
-      ...listItem,
-      weightedPosition,
-    }
-  })
+  return list.map((listItem) => ({
+    ...listItem,
+    weightedPosition: getLearnedPosition(listItem.itemId, trips, now, lambda),
+  }))
 }

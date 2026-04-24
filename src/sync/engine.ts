@@ -370,21 +370,9 @@ async function resolveConflictAutomatically(job: ConflictRetryJob): Promise<Sync
 
 // === Manual Sync Operations ===
 
-/**
- * Flushes local state to the server, handling conflicts with exponential backoff retry.
- *
- * Flow:
- * 1. If already flushing, mark flushRequested=true and wait for existing flush to complete
- * 2. Wait for hydration if not explicitly disabled
- * 3. Push state with base version from hydration or server
- * 4. On success: apply server state and clear pending flag
- * 5. On conflict: schedule background retry with backoff
- * 6. Finally: if flushRequested was set, re-trigger flush
- */
 export async function flush(options: { waitForHydration?: boolean } = {}): Promise<void> {
   if (!handlers || !latestState || !online) return
 
-  // Already flushing - coalesce by requesting another flush after this one
   if (flushInProgress) {
     clearTimer()
     flushRequested = true

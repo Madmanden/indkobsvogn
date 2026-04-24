@@ -269,11 +269,10 @@ function App() {
   }
 
   return (
-    <ErrorBoundary>
-      <main className="app">
-        <div className="shell">
-          {screen === 'stores' && (
-            <ErrorBoundary>
+    <main className="app">
+      <div className="shell">
+        {screen === 'stores' && (
+          <ErrorBoundary>
             <StoresScreen
               stores={appState.stores}
               selectedStoreId={appState.selectedStoreId}
@@ -338,9 +337,8 @@ function App() {
         {isAddStoreOpen ? (
           <AddStoreModal onCreate={addStore} onCancel={() => setIsAddStoreOpen(false)} />
         ) : null}
-        </div>
-      </main>
-    </ErrorBoundary>
+      </div>
+    </main>
   )
 }
 

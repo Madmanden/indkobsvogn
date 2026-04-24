@@ -25,36 +25,6 @@ function handleSessionLoadError(error: unknown, setAuthError: (value: string | n
   return false
 }
 
-function handleSessionError(
-  error: unknown,
-  setStatus: (status: 'loading' | 'unauthenticated' | 'authenticated') => void,
-  setUser: (user: HouseholdMeResponse['user'] | null) => void,
-  setHousehold: (household: HouseholdRecord | null) => void,
-  setAuthError: (error: string | null) => void,
-): 'handled' | 'unhandled' {
-  if (error instanceof Error && error.message === 'no_household') {
-    setStatus('authenticated')
-    setUser((error as Error & { user?: HouseholdMeResponse['user'] }).user ?? null)
-    setHousehold(null)
-    setAuthError(null)
-    return 'handled'
-  }
-
-  if (handleSessionLoadError(error, setAuthError)) {
-    setStatus('unauthenticated')
-    setUser(null)
-    setHousehold(null)
-    return 'handled'
-  }
-
-  console.error('Session load failed:', error)
-  setAuthError('Kunne ikke oprette forbindelse til serveren.')
-  setStatus('unauthenticated')
-  setUser(null)
-  setHousehold(null)
-  return 'handled'
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<'loading' | 'unauthenticated' | 'authenticated'>('loading')
   const [user, setUser] = useState<HouseholdMeResponse['user'] | null>(null)
@@ -73,7 +43,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus('authenticated')
       setAuthError(null)
     } catch (error) {
-      handleSessionError(error, setStatus, setUser, setHousehold, setAuthError)
+      if (error instanceof Error && error.message === 'no_household') {
+        setStatus('authenticated')
+        setUser((error as Error & { user?: HouseholdMeResponse['user'] }).user ?? null)
+        setHousehold(null)
+        setAuthError(null)
+        return
+      }
+
+      if (handleSessionLoadError(error, setAuthError)) {
+        setStatus('unauthenticated')
+        setUser(null)
+        setHousehold(null)
+        return
+      }
+
+      console.error('Auth refresh failed:', error)
+      setAuthError('Kunne ikke oprette forbindelse til serveren.')
+      setStatus('unauthenticated')
+      setUser(null)
+      setHousehold(null)
     }
   }
 
@@ -81,8 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     async function loadSession(): Promise<void> {
-      if (cancelled) return
-
       try {
         const response = await getHouseholdMe()
         if (cancelled) return
@@ -93,7 +80,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthError(null)
       } catch (error) {
         if (cancelled) return
-        handleSessionError(error, setStatus, setUser, setHousehold, setAuthError)
+
+        if (error instanceof Error && error.message === 'no_household') {
+          setStatus('authenticated')
+          setUser((error as Error & { user?: HouseholdMeResponse['user'] }).user ?? null)
+          setHousehold(null)
+          setAuthError(null)
+          return
+        }
+
+        if (handleSessionLoadError(error, setAuthError)) {
+          setStatus('unauthenticated')
+          setUser(null)
+          setHousehold(null)
+          return
+        }
+
+        console.error('Session load failed:', error)
+        setAuthError('Kunne ikke oprette forbindelse til serveren.')
+        setStatus('unauthenticated')
+        setUser(null)
+        setHousehold(null)
       }
     }
 

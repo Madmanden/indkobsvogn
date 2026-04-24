@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { persistWeightedPositions } from '../src/domain/app-state'
-import { recalculateWeightedPositions } from '../src/domain/learning'
+import { getLearnedPosition, recalculateWeightedPositions } from '../src/domain/learning'
 import type { AppState, ListItem, Trip } from '../src/domain/models'
 import { getPlanningRows } from '../src/utils/list'
 
@@ -57,6 +57,54 @@ function makeState(trips: Trip[]): AppState {
     currentSequence: [],
   }
 }
+
+describe('getLearnedPosition', () => {
+  it('returns default position 1 when there are no trips', () => {
+    expect(getLearnedPosition('item-a', [], 100)).toBe(1)
+  })
+
+  it('returns default position 1 when the item never appears in any trip', () => {
+    const trips: Trip[] = [
+      { id: 'trip-1', storeId: 'store-1', completedAt: 100, sequence: ['item-b'] },
+    ]
+    expect(getLearnedPosition('item-a', trips, 100)).toBe(1)
+  })
+
+  it('returns 0 for the only item in a single-item trip', () => {
+    const trips: Trip[] = [
+      { id: 'trip-1', storeId: 'store-1', completedAt: 100, sequence: ['item-a'] },
+    ]
+    expect(getLearnedPosition('item-a', trips, 100)).toBe(0)
+  })
+
+  it('returns 0 for the first item and 1 for the last item in a two-item trip', () => {
+    const trips: Trip[] = [
+      { id: 'trip-1', storeId: 'store-1', completedAt: 100, sequence: ['item-a', 'item-b'] },
+    ]
+    expect(getLearnedPosition('item-a', trips, 100)).toBe(0)
+    expect(getLearnedPosition('item-b', trips, 100)).toBe(1)
+  })
+
+  it('returns 0.5 for an item that appears first in one trip and last in another (equal weight)', () => {
+    const trips: Trip[] = [
+      { id: 'trip-1', storeId: 'store-1', completedAt: 100, sequence: ['item-a', 'item-b'] },
+      { id: 'trip-2', storeId: 'store-1', completedAt: 100, sequence: ['item-b', 'item-a'] },
+    ]
+    expect(getLearnedPosition('item-a', trips, 100, 0.05)).toBe(0.5)
+  })
+
+  it('weights recent trips more heavily than older ones', () => {
+    const now = 10 * 24 * 60 * 60 * 1000
+    const oneDayMs = 24 * 60 * 60 * 1000
+    const trips: Trip[] = [
+      { id: 'old', storeId: 'store-1', completedAt: now - 9 * oneDayMs, sequence: ['item-b', 'item-a'] },
+      { id: 'new', storeId: 'store-1', completedAt: now - oneDayMs, sequence: ['item-a', 'item-b'] },
+    ]
+    const posA = getLearnedPosition('item-a', trips, now, 0.2)
+    const posB = getLearnedPosition('item-b', trips, now, 0.2)
+    expect(posA).toBeLessThan(posB)
+  })
+})
 
 describe('recalculateWeightedPositions', () => {
   it('puts unseen items at default bottom position', () => {

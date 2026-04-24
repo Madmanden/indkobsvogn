@@ -1165,6 +1165,38 @@ a {
   background: radial-gradient(circle, rgba(187, 132, 65, 0.12) 0%, rgba(187, 132, 65, 0) 70%);
 }
 
+.loyalty-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(247, 251, 245, 0.85);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.loyalty-close-btn:hover,
+.loyalty-close-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+  color: #f7fbf5;
+  outline: none;
+}
+
+.loyalty-close-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
 .loyalty-eyebrow {
   color: rgba(247, 251, 245, 0.65);
 }
@@ -2309,5 +2341,10 @@ a {
   .loyalty-screen {
     padding-top: 20px;
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+
+  .loyalty-close-btn {
+    top: calc(16px + env(safe-area-inset-top));
+    right: calc(16px + env(safe-area-inset-right));
   }
 }

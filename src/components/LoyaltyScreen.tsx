@@ -71,7 +71,21 @@ export function LoyaltyScreen({ selectedStore, onDismiss }: Props) {
   }, [])
 
   return (
-    <section className="loyalty-screen" onClick={onDismiss}>
+    <section className="loyalty-screen">
+      <button
+        type="button"
+        className="loyalty-close-btn"
+        onClick={(event) => {
+          event.stopPropagation()
+          onDismiss()
+        }}
+        aria-label="Luk loyalitetskort"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
       <p className="eyebrow loyalty-eyebrow">Loyalitetskort</p>
       <h1 className="loyalty-title">{selectedStore.name}</h1>
       {selectedStore.loyaltyCardImage ? (
@@ -83,7 +97,7 @@ export function LoyaltyScreen({ selectedStore, onDismiss }: Props) {
       ) : (
         <div className="loyalty-qr" />
       )}
-      <p className="loyalty-dismiss">Tryk hvor som helst for at lukke</p>
+      <p className="loyalty-dismiss">Tryk på X for at lukke</p>
     </section>
   )
 }

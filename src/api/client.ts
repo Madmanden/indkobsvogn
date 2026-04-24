@@ -164,7 +164,7 @@ export async function verifySignIn(token: string): Promise<void> {
     redirect: 'follow',
   })
 
-  if (!response.ok) {
+  if (!response.ok && response.status !== 200) {
     const error = (await response.json().catch(() => null)) as { error?: string } | null
     if (error?.error === 'email_not_allowed') {
       throw new Error('email_not_allowed')
