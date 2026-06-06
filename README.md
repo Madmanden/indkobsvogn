@@ -17,7 +17,7 @@ bun install
 bun run dev
 ```
 
-Åbn `http://localhost:8788`, når udviklingsserveren er startet.
+Åbn den lokale URL, som udviklingsserveren viser i terminalen.
 
 Hvis du vil have lokal levering af magic links, så kopiér `.dev.vars.example` til `.dev.vars` og sæt `RESEND_API_KEY`.
 
@@ -28,14 +28,6 @@ bun run build
 bun run test
 bun run preview
 ```
-
-## Deploy
-
-- Cloudflare Pages til frontend
-- Cloudflare Pages Functions til API'et
-- Cloudflare D1 til husstandens data
-- `bun run deploy:pages` til manuel deploy fra denne maskine
-- Når der bliver bedt om at committe ændringer, så skal der også pushes og deployes, medmindre andet er aftalt
 
 ## Dokumentation
 
@@ -51,10 +43,4 @@ bun run preview
 - Vite 8
 - TypeScript
 - Plain CSS
-- Hono på Cloudflare Pages Functions
-
----
-
-## Repo workflow note
-
-When asked to commit changes in this repo, also push and deploy unless explicitly told not to. Wrangler deploys should use `--commit-dirty=true`.
+- Hono on the backend

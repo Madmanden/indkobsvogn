@@ -1,8 +1,0 @@
-name = "indkobsvogn-web"
-pages_build_output_dir = "dist"
-compatibility_date = "2026-03-20"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "indkobsvogn-prod"
-database_id = "678656fb-6272-4bdf-894a-24f72ad04d82"
