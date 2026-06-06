@@ -5,7 +5,7 @@ Indkøbsvogn er en dansk, lokal-først indkøbsplanlægger, der lærer din rute 
 ## Hvad den gør
 - Butiksbevidst planlægnings- og indkøbsflow
 - Lærer varernes rækkefølge ud fra afsluttede ture
-- Husstandslogin med magic links
+- Husstandslogin med magic links og 6-cifret kode
 - Telefon-først redigering af ture: den igangværende indkøbsliste forbliver lokal, mens butikker/varer/afsluttede ture synkroniseres
 - Loyalitetskort pr. butik
 - Offline-først, mobilvenlig brugerflade
@@ -43,4 +43,4 @@ bun run preview
 - Vite 8
 - TypeScript
 - Plain CSS
-- Hono on the backend
+- Hono i `api/`
