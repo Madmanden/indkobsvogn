@@ -12,9 +12,6 @@ export function AddStoreModal({ onCreate, onCancel }: Props) {
   const nameInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    setName('')
-    setLocation('')
-    setError(null)
     window.requestAnimationFrame(() => {
       nameInputRef.current?.focus()
     })

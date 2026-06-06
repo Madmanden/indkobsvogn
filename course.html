@@ -1,0 +1,2688 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Indkøbsvogn Course</title>
+    <meta
+      name="description"
+      content="A single-file interactive course that explains how Indkøbsvogn works under the hood."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6efe4;
+        --bg-alt: #efe3d0;
+        --panel: #fff8ef;
+        --panel-strong: #fff2e1;
+        --ink: #211914;
+        --muted: #6b5a4e;
+        --line: #dcc8b3;
+        --line-strong: #c7af95;
+        --accent: #d85b3d;
+        --accent-strong: #be4328;
+        --accent-soft: #f2b39f;
+        --accent-pale: #fbe1d7;
+        --code-bg: #1e1e2e;
+        --code-ink: #e8e2da;
+        --code-line: rgba(255, 255, 255, 0.08);
+        --green: #4f8c6c;
+        --red: #c86454;
+        --shadow: 0 18px 50px rgba(50, 30, 12, 0.1);
+        --shadow-soft: 0 10px 28px rgba(50, 30, 12, 0.06);
+        --radius-xl: 30px;
+        --radius-lg: 22px;
+        --radius-md: 16px;
+        --radius-sm: 12px;
+        --space-1: 0.25rem;
+        --space-2: 0.5rem;
+        --space-3: 0.75rem;
+        --space-4: 1rem;
+        --space-5: 1.25rem;
+        --space-6: 1.5rem;
+        --space-8: 2rem;
+        --space-10: 2.5rem;
+        --space-12: 3rem;
+        --space-16: 4rem;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-snap-type: y proximity;
+      }
+
+      body {
+        margin: 0;
+        font-family: "DM Sans", system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(216, 91, 61, 0.1), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(79, 140, 108, 0.08), transparent 24%),
+          linear-gradient(180deg, var(--bg), var(--bg-alt));
+        color: var(--ink);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+        background-size: 100% 28px, 28px 100%;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 72%);
+        opacity: 0.25;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .skip-link {
+        position: absolute;
+        left: 1rem;
+        top: 1rem;
+        padding: 0.75rem 1rem;
+        background: var(--ink);
+        color: #fff;
+        border-radius: 999px;
+        transform: translateY(-180%);
+        transition: transform 0.2s ease;
+        z-index: 50;
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .frame {
+        width: min(1440px, calc(100vw - 2rem));
+        margin: 0 auto;
+        padding: var(--space-4) 0 var(--space-16);
+        display: grid;
+        grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+        gap: var(--space-8);
+      }
+
+      .sidebar {
+        position: sticky;
+        top: var(--space-4);
+        align-self: start;
+        padding: var(--space-6);
+        border: 1px solid rgba(104, 78, 54, 0.12);
+        border-radius: var(--radius-xl);
+        background: rgba(255, 248, 239, 0.86);
+        backdrop-filter: blur(12px);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .brand-mark {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+
+      .brand-dot {
+        width: 0.85rem;
+        height: 0.85rem;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 0 0.3rem rgba(216, 91, 61, 0.16);
+      }
+
+      .sidebar h1 {
+        margin: var(--space-5) 0 var(--space-3);
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: clamp(1.9rem, 4vw, 2.6rem);
+        line-height: 0.95;
+        letter-spacing: -0.05em;
+      }
+
+      .sidebar p {
+        margin: 0 0 var(--space-4);
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .sidebar-badges,
+      .hero-badges,
+      .glossary-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .badge,
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.55rem 0.8rem;
+        border-radius: 999px;
+        border: 1px solid rgba(122, 92, 61, 0.16);
+        background: rgba(255, 255, 255, 0.62);
+        color: var(--ink);
+        font-size: 0.88rem;
+        line-height: 1;
+        box-shadow: 0 6px 18px rgba(64, 38, 14, 0.04);
+      }
+
+      .badge--accent {
+        background: rgba(216, 91, 61, 0.12);
+        border-color: rgba(216, 91, 61, 0.18);
+      }
+
+      .sidebar-nav {
+        display: grid;
+        gap: var(--space-2);
+        margin-top: var(--space-6);
+      }
+
+      .nav-button {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        width: 100%;
+        padding: 0.9rem 1rem;
+        border: 1px solid transparent;
+        border-radius: 18px;
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+        text-align: left;
+        transition:
+          transform 0.18s ease,
+          background 0.18s ease,
+          border-color 0.18s ease;
+      }
+
+      .nav-button:hover,
+      .nav-button:focus-visible {
+        transform: translateX(4px);
+        background: rgba(255, 255, 255, 0.75);
+        border-color: rgba(122, 92, 61, 0.14);
+        outline: none;
+      }
+
+      .nav-button.is-active {
+        background: rgba(216, 91, 61, 0.14);
+        border-color: rgba(216, 91, 61, 0.2);
+      }
+
+      .nav-index {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.78rem;
+        color: var(--accent-strong);
+      }
+
+      .nav-title {
+        font-weight: 700;
+      }
+
+      .nav-subtitle {
+        display: block;
+        margin-top: 0.2rem;
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+
+      .main {
+        display: grid;
+        gap: var(--space-8);
+      }
+
+      .hero {
+        padding: clamp(1.5rem, 3vw, 2.5rem);
+        border: 1px solid rgba(122, 92, 61, 0.14);
+        border-radius: var(--radius-xl);
+        background:
+          linear-gradient(145deg, rgba(255, 248, 239, 0.98), rgba(255, 244, 231, 0.88)),
+          radial-gradient(circle at top right, rgba(216, 91, 61, 0.12), transparent 35%);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+        gap: var(--space-8);
+        align-items: center;
+      }
+
+      .eyebrow {
+        margin: 0 0 var(--space-3);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent-strong);
+      }
+
+      .hero h2,
+      .chapter h2 {
+        margin: 0;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: clamp(2.2rem, 5vw, 4.2rem);
+        line-height: 0.95;
+        letter-spacing: -0.07em;
+      }
+
+      .hero p,
+      .chapter-lead,
+      .screen-copy p,
+      .quiz-intro,
+      .wrap-up-copy {
+        line-height: 1.75;
+        color: var(--muted);
+      }
+
+      .hero-copy {
+        display: grid;
+        gap: var(--space-4);
+      }
+
+      .hero-copy strong {
+        color: var(--ink);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        margin-top: var(--space-2);
+      }
+
+      .hero-button,
+      .quiz-option,
+      .cta-button {
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        transition:
+          transform 0.18s ease,
+          box-shadow 0.18s ease,
+          background 0.18s ease;
+      }
+
+      .hero-button {
+        padding: 0.8rem 1.1rem;
+        font-weight: 700;
+      }
+
+      .hero-button--primary,
+      .cta-button,
+      .quiz-option.is-correct {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 14px 26px rgba(216, 91, 61, 0.26);
+      }
+
+      .hero-button--secondary {
+        background: rgba(255, 255, 255, 0.8);
+        color: var(--ink);
+        border: 1px solid rgba(122, 92, 61, 0.14);
+      }
+
+      .hero-button:hover,
+      .cta-button:hover,
+      .quiz-option:hover {
+        transform: translateY(-1px);
+      }
+
+      .hero-notes {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-3);
+        margin-top: var(--space-5);
+      }
+
+      .note-card {
+        padding: 1rem;
+        border-radius: 18px;
+        border: 1px solid rgba(122, 92, 61, 0.12);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .note-card h3 {
+        margin: 0 0 0.45rem;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: 1rem;
+      }
+
+      .note-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.55;
+        font-size: 0.95rem;
+      }
+
+      .hero-visual {
+        position: relative;
+        min-height: 420px;
+        padding: 1.2rem;
+        border-radius: 26px;
+        background:
+          linear-gradient(180deg, rgba(32, 25, 20, 0.92), rgba(32, 25, 20, 0.9)),
+          radial-gradient(circle at top left, rgba(216, 91, 61, 0.18), transparent 40%);
+        color: #f9f2ea;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        overflow: hidden;
+      }
+
+      .hero-visual::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at top right, rgba(216, 91, 61, 0.22), transparent 28%),
+          radial-gradient(circle at bottom left, rgba(79, 140, 108, 0.14), transparent 35%);
+        pointer-events: none;
+      }
+
+      .hero-track {
+        position: relative;
+        display: grid;
+        gap: 0.9rem;
+        padding: 0.6rem;
+      }
+
+      .hero-step {
+        display: grid;
+        gap: 0.35rem;
+        padding: 1rem 1.05rem;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(4px);
+      }
+
+      .hero-step strong {
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: 1.1rem;
+      }
+
+      .hero-step span {
+        color: rgba(255, 248, 239, 0.74);
+        font-size: 0.93rem;
+      }
+
+      .hero-arrow {
+        font-family: "JetBrains Mono", monospace;
+        text-align: center;
+        color: rgba(255, 248, 239, 0.72);
+        letter-spacing: 0.2em;
+        animation: pulseArrow 2.8s ease-in-out infinite;
+      }
+
+      .hero-metric {
+        position: absolute;
+        bottom: 1rem;
+        left: 1rem;
+        right: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding: 1rem;
+        border-radius: 18px;
+        background: rgba(255, 248, 239, 0.08);
+        backdrop-filter: blur(8px);
+      }
+
+      .hero-metric .metric-label {
+        display: block;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: rgba(255, 248, 239, 0.68);
+      }
+
+      .hero-metric .metric-value {
+        display: block;
+        margin-top: 0.25rem;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: 1.2rem;
+        font-weight: 800;
+      }
+
+      .hero-metric .metric-pill {
+        padding: 0.55rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(255, 248, 239, 0.08);
+        color: #fff;
+        font-size: 0.88rem;
+        white-space: nowrap;
+      }
+
+      .module-list {
+        display: grid;
+        gap: var(--space-8);
+      }
+
+      .chapter {
+        scroll-snap-align: start;
+        padding: clamp(1.2rem, 2.4vw, 2rem);
+        border: 1px solid rgba(122, 92, 61, 0.14);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+      }
+
+      .chapter:nth-of-type(odd) {
+        background: linear-gradient(180deg, rgba(255, 248, 239, 0.96), rgba(246, 236, 220, 0.96));
+      }
+
+      .chapter:nth-of-type(even) {
+        background: linear-gradient(180deg, rgba(244, 232, 215, 0.96), rgba(255, 247, 235, 0.94));
+      }
+
+      .chapter-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-4);
+        align-items: end;
+        margin-bottom: var(--space-6);
+      }
+
+      .chapter h2 {
+        font-size: clamp(1.9rem, 4vw, 3rem);
+        line-height: 1;
+      }
+
+      .chapter-lead {
+        margin: var(--space-3) 0 0;
+        max-width: 68ch;
+      }
+
+      .chapter-meta {
+        display: grid;
+        gap: 0.4rem;
+        text-align: right;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .chapter-meta strong {
+        color: var(--ink);
+        font-size: 1rem;
+      }
+
+      .screen-grid {
+        display: grid;
+        gap: var(--space-5);
+      }
+
+      .screen {
+        display: grid;
+        gap: var(--space-5);
+        padding: 1.15rem;
+        border-radius: 24px;
+        border: 1px solid rgba(122, 92, 61, 0.12);
+        background: rgba(255, 250, 244, 0.88);
+      }
+
+      .screen--code {
+        background: linear-gradient(180deg, rgba(255, 250, 244, 0.96), rgba(247, 240, 227, 0.92));
+      }
+
+      .screen-copy {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .screen-copy h3 {
+        margin: 0;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+        letter-spacing: -0.04em;
+      }
+
+      .screen-copy p {
+        margin: 0;
+        max-width: 70ch;
+      }
+
+      .screen-visual {
+        padding: 1rem;
+        border-radius: 20px;
+        border: 1px solid rgba(122, 92, 61, 0.1);
+        background: rgba(255, 255, 255, 0.65);
+      }
+
+      .visual-title {
+        margin: 0 0 0.85rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.74rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent-strong);
+      }
+
+      .journey-visual,
+      .actor-visual,
+      .memory-visual,
+      .sync-visual,
+      .learning-visual,
+      .safety-visual {
+        position: relative;
+        display: grid;
+        align-items: stretch;
+        gap: 0.75rem;
+      }
+
+      .journey-visual {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .journey-node,
+      .actor-card,
+      .memory-card,
+      .sync-card,
+      .learning-card,
+      .safety-card {
+        padding: 1rem;
+        border-radius: 18px;
+        border: 1px solid rgba(122, 92, 61, 0.14);
+        background: rgba(255, 255, 255, 0.78);
+        box-shadow: 0 10px 20px rgba(74, 42, 12, 0.05);
+      }
+
+      .journey-node strong,
+      .actor-card strong,
+      .memory-card strong,
+      .sync-card strong,
+      .learning-card strong,
+      .safety-card strong {
+        display: block;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: 1rem;
+        margin-bottom: 0.35rem;
+      }
+
+      .journey-node span,
+      .actor-card span,
+      .memory-card span,
+      .sync-card span,
+      .learning-card span,
+      .safety-card span {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+
+      .journey-arrow,
+      .memory-arrow,
+      .sync-arrow {
+        display: grid;
+        place-items: center;
+        min-height: 2rem;
+        color: var(--accent-strong);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 1rem;
+        letter-spacing: 0.2em;
+      }
+
+      .actors-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+        gap: 0.9rem;
+      }
+
+      .stack {
+        display: grid;
+        gap: 0.7rem;
+      }
+
+      .actor-card--main {
+        background: rgba(216, 91, 61, 0.12);
+        border-color: rgba(216, 91, 61, 0.18);
+      }
+
+      .actor-card--screen {
+        background: rgba(79, 140, 108, 0.1);
+      }
+
+      .actor-note,
+      .callout {
+        padding: 1rem 1.05rem;
+        border-left: 4px solid var(--accent);
+        border-radius: 18px;
+        background: rgba(216, 91, 61, 0.08);
+        color: var(--ink);
+      }
+
+      .actor-note strong,
+      .callout strong {
+        display: block;
+        margin-bottom: 0.35rem;
+      }
+
+      .memory-visual {
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        align-items: center;
+      }
+
+      .memory-card--highlight {
+        background: rgba(79, 140, 108, 0.12);
+      }
+
+      .sync-visual {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .sync-card--server {
+        background: rgba(79, 140, 108, 0.1);
+      }
+
+      .sync-card--warning {
+        background: rgba(200, 100, 84, 0.1);
+      }
+
+      .sync-badge,
+      .status-pill,
+      .lesson-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(122, 92, 61, 0.1);
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .sync-badge {
+        justify-self: center;
+        align-self: center;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--accent-strong);
+        letter-spacing: 0.12em;
+      }
+
+      .learning-visual {
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+        gap: 1rem;
+        align-items: end;
+      }
+
+      .bars {
+        display: grid;
+        gap: 0.7rem;
+      }
+
+      .bar {
+        display: grid;
+        gap: 0.35rem;
+      }
+
+      .bar-track {
+        height: 14px;
+        border-radius: 999px;
+        background: rgba(122, 92, 61, 0.08);
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--accent), #f28f6e);
+        box-shadow: 0 8px 16px rgba(216, 91, 61, 0.18);
+      }
+
+      .bar small {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        color: var(--muted);
+      }
+
+      .bar small strong {
+        color: var(--ink);
+      }
+
+      .learning-note {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .learning-note .mini-stat {
+        display: grid;
+        gap: 0.25rem;
+        padding: 1rem;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.84);
+        border: 1px solid rgba(122, 92, 61, 0.1);
+      }
+
+      .mini-stat strong {
+        font-size: 1.1rem;
+      }
+
+      .safety-visual {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.85rem;
+      }
+
+      .shield-card {
+        background: rgba(216, 91, 61, 0.1);
+      }
+
+      .shield-card--cool {
+        background: rgba(79, 140, 108, 0.1);
+      }
+
+      .step-list {
+        display: grid;
+        gap: 0.7rem;
+      }
+
+      .step-item {
+        display: flex;
+        gap: 0.8rem;
+        align-items: flex-start;
+      }
+
+      .step-item .step-index {
+        flex: none;
+        width: 2.1rem;
+        height: 2.1rem;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: rgba(216, 91, 61, 0.12);
+        color: var(--accent-strong);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+      }
+
+      .snippet {
+        display: grid;
+        gap: var(--space-4);
+        margin-top: var(--space-2);
+      }
+
+      .snippet-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+      }
+
+      .snippet-file {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 999px;
+        background: rgba(30, 30, 46, 0.96);
+        color: #f9f4ec;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+      }
+
+      .snippet-tag {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .snippet-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr);
+        gap: 1rem;
+        align-items: start;
+      }
+
+      .code-pane,
+      .english-pane {
+        min-width: 0;
+        border-radius: 22px;
+        overflow: hidden;
+        border: 1px solid rgba(122, 92, 61, 0.12);
+      }
+
+      .code-pane {
+        background: var(--code-bg);
+        color: var(--code-ink);
+      }
+
+      .english-pane {
+        background: rgba(255, 251, 246, 0.96);
+      }
+
+      .code-lines,
+      .english-lines {
+        margin: 0;
+        padding: 1rem;
+        list-style: none;
+      }
+
+      .code-row,
+      .english-row {
+        display: grid;
+        grid-template-columns: 2.1rem minmax(0, 1fr);
+        gap: 0.8rem;
+        align-items: start;
+        padding: 0.22rem 0;
+        min-height: 1.45rem;
+      }
+
+      .line-no {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.76rem;
+        color: rgba(255, 255, 255, 0.38);
+      }
+
+      .english-pane .line-no {
+        color: rgba(30, 30, 46, 0.34);
+      }
+
+      .code-line {
+        display: block;
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.6;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.9rem;
+      }
+
+      .token.keyword {
+        color: #f38ba8;
+      }
+
+      .token.string {
+        color: #a6e3a1;
+      }
+
+      .token.number {
+        color: #f9e2af;
+      }
+
+      .token.comment {
+        color: #7f8ea3;
+        font-style: italic;
+      }
+
+      .english-line {
+        color: var(--ink);
+        line-height: 1.62;
+      }
+
+      .english-line .term {
+        border-bottom-color: rgba(216, 91, 61, 0.45);
+      }
+
+      .quiz {
+        display: grid;
+        gap: var(--space-4);
+        margin-top: var(--space-5);
+        padding-top: var(--space-2);
+      }
+
+      .quiz-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+      }
+
+      .quiz-head h3 {
+        margin: 0;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+        letter-spacing: -0.04em;
+      }
+
+      .quiz-intro {
+        margin: 0;
+        max-width: 65ch;
+      }
+
+      .question {
+        display: grid;
+        gap: var(--space-3);
+        padding: 1.05rem;
+        border-radius: 22px;
+        border: 1px solid rgba(122, 92, 61, 0.12);
+        background: rgba(255, 248, 239, 0.9);
+      }
+
+      .question-prompt {
+        margin: 0;
+        font-weight: 700;
+        color: var(--ink);
+        line-height: 1.55;
+      }
+
+      .question-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .quiz-option {
+        padding: 0.8rem 1rem;
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid rgba(122, 92, 61, 0.14);
+        color: var(--ink);
+      }
+
+      .quiz-option.is-picked {
+        border-color: rgba(216, 91, 61, 0.38);
+        background: rgba(216, 91, 61, 0.12);
+      }
+
+      .quiz-option.is-wrong {
+        border-color: rgba(200, 100, 84, 0.45);
+        background: rgba(200, 100, 84, 0.12);
+      }
+
+      .question-feedback {
+        display: none;
+        margin: 0;
+        padding: 0.85rem 0.95rem;
+        border-radius: 16px;
+        background: rgba(79, 140, 108, 0.1);
+        border: 1px solid rgba(79, 140, 108, 0.18);
+        color: var(--ink);
+        line-height: 1.65;
+      }
+
+      .question-feedback.is-visible {
+        display: block;
+      }
+
+      .question-feedback strong {
+        display: inline-block;
+        margin-right: 0.35rem;
+      }
+
+      .wrap-up {
+        padding: 1.4rem;
+        border-radius: var(--radius-xl);
+        background: linear-gradient(135deg, rgba(32, 25, 20, 0.96), rgba(56, 39, 25, 0.98));
+        color: #fbf4ec;
+        box-shadow: var(--shadow);
+      }
+
+      .wrap-up h2 {
+        margin: 0;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: clamp(1.7rem, 3.4vw, 2.8rem);
+        letter-spacing: -0.05em;
+      }
+
+      .wrap-up-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-3);
+        margin-top: var(--space-5);
+      }
+
+      .wrap-up-card {
+        padding: 1rem;
+        border-radius: 18px;
+        background: rgba(255, 248, 239, 0.08);
+        border: 1px solid rgba(255, 248, 239, 0.08);
+      }
+
+      .wrap-up-card strong {
+        display: block;
+        margin-bottom: 0.4rem;
+        font-family: "Bricolage Grotesque", system-ui, sans-serif;
+        font-size: 1rem;
+      }
+
+      .wrap-up-card span {
+        color: rgba(251, 244, 236, 0.72);
+        line-height: 1.6;
+      }
+
+      .term {
+        display: inline;
+        border-bottom: 1.5px dashed rgba(103, 76, 50, 0.5);
+        cursor: pointer;
+        position: relative;
+        color: var(--ink);
+        background: transparent;
+      }
+
+      .term:focus-visible {
+        outline: 2px solid rgba(216, 91, 61, 0.3);
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+
+      .tooltip {
+        position: fixed;
+        z-index: 1000;
+        max-width: min(280px, calc(100vw - 2rem));
+        padding: 0.8rem 0.9rem;
+        border-radius: 16px;
+        border: 1px solid rgba(122, 92, 61, 0.18);
+        background: rgba(28, 24, 21, 0.96);
+        color: #f8f2ea;
+        box-shadow: 0 18px 40px rgba(20, 14, 9, 0.24);
+        font-size: 0.9rem;
+        line-height: 1.55;
+        pointer-events: none;
+      }
+
+      .tooltip[data-placement="bottom"]::before,
+      .tooltip[data-placement="top"]::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        width: 0.75rem;
+        height: 0.75rem;
+        background: inherit;
+        border-left: 1px solid rgba(122, 92, 61, 0.18);
+        border-top: 1px solid rgba(122, 92, 61, 0.18);
+        transform: translateX(-50%) rotate(45deg);
+      }
+
+      .tooltip[data-placement="bottom"]::before {
+        top: -0.35rem;
+      }
+
+      .tooltip[data-placement="top"]::before {
+        bottom: -0.35rem;
+      }
+
+      .term-highlight {
+        animation: termPulse 1.4s ease;
+      }
+
+      @keyframes pulseArrow {
+        0%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.72;
+        }
+        50% {
+          transform: translateY(2px);
+          opacity: 1;
+        }
+      }
+
+      @keyframes termPulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(216, 91, 61, 0.2);
+        }
+        100% {
+          box-shadow: 0 0 0 0.85rem rgba(216, 91, 61, 0);
+        }
+      }
+
+      @media (max-width: 1080px) {
+        .frame {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: relative;
+          top: 0;
+        }
+
+        .sidebar-nav {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .hero-grid,
+        .snippet-grid,
+        .actors-grid,
+        .learning-visual,
+        .wrap-up-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-visual,
+        .memory-visual,
+        .sync-visual,
+        .safety-visual {
+          grid-template-columns: 1fr;
+        }
+
+        .journey-visual {
+          grid-template-columns: 1fr;
+        }
+
+        .chapter-head {
+          grid-template-columns: 1fr;
+          text-align: left;
+        }
+
+        .chapter-meta {
+          text-align: left;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .frame {
+          width: min(100vw, calc(100vw - 1rem));
+          gap: var(--space-6);
+        }
+
+        .sidebar {
+          padding: 1rem;
+        }
+
+        .sidebar-nav {
+          grid-template-columns: 1fr;
+        }
+
+        .hero,
+        .chapter {
+          padding: 1rem;
+        }
+
+        .hero-notes {
+          grid-template-columns: 1fr;
+        }
+
+        .code-row,
+        .english-row {
+          grid-template-columns: 1.7rem minmax(0, 1fr);
+          gap: 0.55rem;
+        }
+
+        .snippet-head {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .question-options {
+          flex-direction: column;
+        }
+
+        .quiz-option {
+          width: 100%;
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#course-main">Skip to course</a>
+    <div class="frame">
+      <aside class="sidebar">
+        <div class="brand-mark">
+          <span class="brand-dot" aria-hidden="true"></span>
+          Indkøbsvogn Course
+        </div>
+        <h1>Learn the app the way a shopper experiences it.</h1>
+        <p>
+          This course follows one grocery trip from the first tap to the final checkout.
+          Then it peels back the code so you can see what lives where, what stays local, and what syncs.
+        </p>
+        <div class="sidebar-badges">
+          <span class="badge badge--accent">Local-first</span>
+          <span class="badge">Household sync</span>
+          <span class="badge">Route learning</span>
+        </div>
+        <nav class="sidebar-nav" id="course-nav" aria-label="Course navigation"></nav>
+        <div style="margin-top: 1rem">
+          <div class="glossary-chips" aria-label="Glossary preview">
+            <span class="chip">Tap terms to explain them</span>
+            <span class="chip">Hover on desktop</span>
+            <span class="chip">Quiz answers are scenario-based</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main" id="course-main">
+        <section class="hero">
+          <div class="hero-grid">
+            <div class="hero-copy">
+              <p class="eyebrow">Single-file interactive course</p>
+              <h2>Indkøbsvogn is a grocery planner that learns the route through the store.</h2>
+              <p>
+                It keeps the active trip on the phone, syncs durable household data in the background,
+                and quietly updates the item order from completed trips.
+                You do not need to be a programmer to follow the story.
+              </p>
+              <p>
+                By the end, you should be able to answer practical questions like:
+                “If a user taps this button, which file handles it?” and
+                “What belongs in <code>store.ts</code> versus <code>sync/engine.ts</code>?”
+              </p>
+              <div class="hero-badges">
+                <span class="badge">Magic link sign-in</span>
+                <span class="badge">Offline cache</span>
+                <span class="badge">Conflict handling</span>
+              </div>
+              <div class="hero-actions">
+                <button class="hero-button hero-button--primary" type="button" data-scroll-target="journey">
+                  Start with the trip
+                </button>
+                <button class="hero-button hero-button--secondary" type="button" data-scroll-target="learning">
+                  Skip to route learning
+                </button>
+              </div>
+              <div class="hero-notes">
+                <article class="note-card">
+                  <h3>Why this course exists</h3>
+                  <p>
+                    The app mixes product flow, local state, and background sync. That makes it a great
+                    place to learn how to steer AI without getting lost.
+                  </p>
+                </article>
+                <article class="note-card">
+                  <h3>How to read it</h3>
+                  <p>
+                    Every module starts with a concrete user action, then zooms into the code underneath.
+                  </p>
+                </article>
+                <article class="note-card">
+                  <h3>What to click</h3>
+                  <p>
+                    Quizzes test what you would do in a new situation, not whether you memorized file names.
+                  </p>
+                </article>
+              </div>
+            </div>
+            <div class="hero-visual" aria-hidden="true">
+              <div class="hero-track">
+                <div class="hero-step">
+                  <strong>1. Pick a store</strong>
+                  <span>Choose the shop you are actually walking into.</span>
+                </div>
+                <div class="hero-arrow">↓</div>
+                <div class="hero-step">
+                  <strong>2. Build the list</strong>
+                  <span>Add items, edit quantities, and let the app remember them.</span>
+                </div>
+                <div class="hero-arrow">↓</div>
+                <div class="hero-step">
+                  <strong>3. Shop the route</strong>
+                  <span>Check items off in the order you encounter them.</span>
+                </div>
+                <div class="hero-arrow">↓</div>
+                <div class="hero-step">
+                  <strong>4. Close the loop</strong>
+                  <span>Save the trip so next time the route is a little smarter.</span>
+                </div>
+              </div>
+              <div class="hero-metric">
+                <div>
+                  <span class="metric-label">Source of truth</span>
+                  <span class="metric-value">Local phone first</span>
+                </div>
+                <span class="metric-pill">Durable data syncs later</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div id="module-list" class="module-list"></div>
+
+        <section class="wrap-up">
+          <p class="eyebrow" style="color: rgba(251, 244, 236, 0.72)">Big picture</p>
+          <h2>If you want to change something, here is the short map.</h2>
+          <p class="wrap-up-copy">
+            Think of the codebase as a small set of specialist rooms. The shell decides which room is visible,
+            persistence keeps the notebook safe, sync moves durable data to and from the server, and the
+            learning code updates the route order after checkout.
+          </p>
+          <div class="wrap-up-grid">
+            <article class="wrap-up-card">
+              <strong>Screen flow</strong>
+              <span><code>App.tsx</code> decides which screen appears and when a trip starts or ends.</span>
+            </article>
+            <article class="wrap-up-card">
+              <strong>Local storage</strong>
+              <span><code>useAppState.ts</code> and <code>domain/store.ts</code> protect the browser cache.</span>
+            </article>
+            <article class="wrap-up-card">
+              <strong>Sync + learning</strong>
+              <span><code>api/client.ts</code>, <code>sync/engine.ts</code>, and <code>domain/app-state.ts</code> keep the household data and route order moving.</span>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="tooltip" class="tooltip" hidden></div>
+
+    <script>
+      const glossary = {
+        API:
+          'An API is a structured doorway that lets one part of software ask another part for data or action.',
+        appState:
+          'App state is the live memory of the app: stores, items, trips, and the flags that describe what the user is doing right now.',
+        component:
+          'A component is a reusable piece of UI. In React, components are how the screen gets broken into smaller jobs.',
+        commit:
+          'A commit writes a fresh version of the app state and tells the rest of the app that something changed.',
+        conflict:
+          'A conflict happens when two versions of the same data disagree. The app has to choose how to reconcile them.',
+        debounce:
+          'Debouncing waits for a short pause before doing work, so repeated edits get bundled into one save.',
+        D1:
+          'Cloudflare D1 is a hosted SQLite database. It is the server-side home for durable household data in this app.',
+        household:
+          'A household is the shared group that can see the same stores, items, and completed trips.',
+        hook:
+          'A hook is a React helper that lets a component tap into state, effects, or other reusable behavior.',
+        JSON:
+          'JSON is a text format for structured data. It is the common shape used by APIs and saved state.',
+        localStorage:
+          'localStorage is the browser’s built-in key-value memory. It survives reloads and restarts on the same device.',
+        'local-first':
+          'Local-first means the phone updates instantly from its own storage, then sync catches up in the background.',
+        'magic link':
+          'A magic link is a login link sent by email. Clicking it proves you control that inbox without a password.',
+        module:
+          'A module is a file or package that owns a specific slice of behavior and exports the pieces others can use.',
+        quota:
+          'A quota is a storage limit. If the browser has too little space left, a write can fail even though the code is valid.',
+        render:
+          'To render means to turn data into something visible on the screen.',
+        'service worker':
+          'A service worker is a background browser script that can cache files and help the app stay updated offline.',
+        sync:
+          'Sync is the process of moving durable data between the device and the server so all household members can share it.',
+        timeout:
+          'A timeout is a safety limit for slow work. If the server takes too long, the request is stopped and the app can explain why.',
+        state:
+          'State is the current data a UI is holding onto. It tells the screen what to show right now.',
+        'weighted position':
+          'Weighted position is a learned ordering number. Lower values mean “show earlier” in the store route.',
+        'wake lock':
+          'Wake lock is a browser feature that keeps the screen from sleeping while the user needs it to stay on.',
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;')
+      }
+
+      function term(label, tip) {
+        const resolvedTip = glossary[tip] || tip
+        return `<span class="term" tabindex="0" role="button" data-tip="${escapeHtml(resolvedTip)}">${escapeHtml(label)}</span>`
+      }
+
+      function highlightLine(line) {
+        let out = escapeHtml(line)
+        out = out.replace(/(&#39;[^&#39;]*&#39;|&quot;[^&quot;]*&quot;)/g, '<span class="token string">$1</span>')
+        out = out.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="token number">$1</span>')
+        out = out.replace(
+          /\b(const|let|if|return|export|function|async|await|type|interface|import|from|new|true|false|null|void|try|catch|finally|for|of|extends|class|super)\b/g,
+          '<span class="token keyword">$1</span>',
+        )
+        out = out.replace(/(\/\/.*$)/g, '<span class="token comment">$1</span>')
+        return out
+      }
+
+      function renderSnippet(snippet) {
+        return `
+          <figure class="snippet">
+            <div class="snippet-head">
+              <div class="snippet-file">${escapeHtml(snippet.file)}</div>
+              <div class="snippet-tag">Exact excerpt from the repo</div>
+            </div>
+            <div class="snippet-grid">
+              <div class="code-pane">
+                <ol class="code-lines">
+                  ${snippet.lines
+                    .map(
+                      (line, index) => `
+                        <li class="code-row">
+                          <span class="line-no">${index + 1}</span>
+                          <span class="code-line">${highlightLine(line)}</span>
+                        </li>
+                      `,
+                    )
+                    .join('')}
+                </ol>
+              </div>
+              <div class="english-pane">
+                <ol class="english-lines">
+                  ${snippet.explanations
+                    .map(
+                      (line, index) => `
+                        <li class="english-row">
+                          <span class="line-no">${index + 1}</span>
+                          <span class="english-line">${line}</span>
+                        </li>
+                      `,
+                    )
+                    .join('')}
+                </ol>
+              </div>
+            </div>
+          </figure>
+        `
+      }
+
+      function renderCardGrid(cards) {
+        return `
+          <div class="screen-visual">
+            <div class="step-list">
+              ${cards
+                .map(
+                  (card, index) => `
+                    <div class="step-item">
+                      <div class="step-index">${index + 1}</div>
+                      <div>
+                        <strong>${card.title}</strong>
+                        <p style="margin:0;color:var(--muted);line-height:1.6">${card.body}</p>
+                      </div>
+                    </div>
+                  `,
+                )
+                .join('')}
+            </div>
+          </div>
+        `
+      }
+
+      function renderVisual(screen) {
+        return screen.visual ? `<div class="screen-visual">${screen.visual}</div>` : ''
+      }
+
+      function renderScreen(screen) {
+        const screenClass = screen.kind === 'code' ? 'screen screen--code' : 'screen screen--visual'
+        return `
+          <article class="${screenClass}">
+            <div class="screen-copy">
+              <p class="eyebrow">${screen.eyebrow}</p>
+              <h3>${screen.title}</h3>
+              ${screen.paragraphs.map((paragraph) => `<p>${paragraph}</p>`).join('')}
+            </div>
+            ${renderVisual(screen)}
+            ${screen.cards ? renderCardGrid(screen.cards) : ''}
+            ${screen.snippet ? renderSnippet(screen.snippet) : ''}
+            ${screen.callout ? `<aside class="callout">${screen.callout}</aside>` : ''}
+          </article>
+        `
+      }
+
+      function renderQuiz(moduleId, quiz) {
+        return `
+          <section class="quiz" aria-labelledby="${moduleId}-quiz-title">
+            <div class="quiz-head">
+              <div>
+                <p class="eyebrow">Quiz</p>
+                <h3 id="${moduleId}-quiz-title">${quiz.title}</h3>
+              </div>
+              <p class="quiz-intro">${quiz.intro}</p>
+            </div>
+            ${quiz.questions
+              .map(
+                (question, questionIndex) => `
+                  <article class="question" data-question data-answer="${question.answer}" data-explanation="${escapeHtml(question.explanation)}">
+                    <p class="question-prompt">${questionIndex + 1}. ${question.prompt}</p>
+                    <div class="question-options" role="group" aria-label="Question ${questionIndex + 1} options">
+                      ${question.options
+                        .map(
+                          (option, optionIndex) => `
+                            <button class="quiz-option" type="button" data-option="${optionIndex}">
+                              ${option}
+                            </button>
+                          `,
+                        )
+                        .join('')}
+                    </div>
+                    <p class="question-feedback" aria-live="polite"></p>
+                  </article>
+                `,
+              )
+              .join('')}
+          </section>
+        `
+      }
+
+      const modules = [
+        {
+          id: 'journey',
+          index: '01',
+          title: 'From tap to cart',
+          subtitle: 'Follow one shopping trip from the store picker to completed checkout.',
+          lead:
+            `The app behaves like a relay race. Each screen passes the baton to the next one, while the active trip stays on the phone until the shopper finishes.`,
+          screens: [
+            {
+              kind: 'visual',
+              eyebrow: 'The trip',
+              title: 'A grocery run is a sequence of screens, not one giant page.',
+              paragraphs: [
+                `The user starts in <code>StoresScreen</code>, chooses a store, and moves into planning. After that, the app switches to shopping mode, then to a confirmation step, and finally into trip completion.`,
+                `That is the big idea of <span class="term" tabindex="0" role="button" data-tip="${escapeHtml(glossary['local-first'])}">local-first</span> design: the app should feel immediate because the phone does the first round of work.`,
+              ],
+              visual: `
+                <div class="journey-visual" aria-hidden="true">
+                  <div class="journey-node">
+                    <strong>Store picker</strong>
+                    <span>Choose the store you are about to walk into.</span>
+                  </div>
+                  <div class="journey-arrow">→</div>
+                  <div class="journey-node">
+                    <strong>Planning</strong>
+                    <span>Build and edit the list before shopping starts.</span>
+                  </div>
+                  <div class="journey-arrow">→</div>
+                  <div class="journey-node">
+                    <strong>Shopping</strong>
+                    <span>Check items off in the order you find them.</span>
+                  </div>
+                  <div class="journey-arrow">→</div>
+                  <div class="journey-node">
+                    <strong>Confirm</strong>
+                    <span>Ask before closing the trip so nobody loses their place.</span>
+                  </div>
+                </div>
+              `,
+            },
+            {
+              kind: 'code',
+              eyebrow: 'Code path',
+              title: 'One helper in <code>App.tsx</code> flips the app into shopping mode.',
+              paragraphs: [
+                `This is the moment when the product behavior turns into code. A button press does not “open a page” in the browser sense; it updates state, then React shows a different screen.`,
+                `If you need to change the start of a trip, this is one of the first places to look.`,
+              ],
+              snippet: {
+                file: 'src/App.tsx',
+                lines: [
+                  '  function startShopping(): void {',
+                  '    commit({',
+                  '      ...appState,',
+                  '      isShopping: true,',
+                  '      currentSequence: [],',
+                  '    })',
+                  "    setScreen('shopping')",
+                  '  }',
+                ],
+                explanations: [
+                  'Define the action that starts a shopping trip.',
+                  'Save a new version of app state.',
+                  'Copy the existing state first.',
+                  'Mark the trip as active.',
+                  'Clear the temporary item trail from any previous run.',
+                  'Write the new state and tell the sync engine something changed.',
+                  'Switch the visible screen to shopping mode.',
+                  'Finish the helper.',
+                ],
+              },
+            },
+            {
+              kind: 'visual',
+              eyebrow: 'Why it matters',
+              title: 'The app keeps temporary trip state separate from durable household data.',
+              paragraphs: [
+                `Temporary things like <code>currentSequence</code> and the active <code>list</code> belong to the in-progress trip. Durable things like stores, items, and completed trips can be synced later.`,
+                `That split is what lets the phone feel fast while still keeping the household shared.`,
+              ],
+              cards: [
+                {
+                  title: 'What stays local',
+                  body: `${term('currentSequence', 'state')} and the active shopping list belong to this device.`,
+                },
+                {
+                  title: 'What can sync',
+                  body: `Stores, items, and completed trips are durable household data.`,
+                },
+                {
+                  title: 'What to edit first',
+                  body: `Change <code>App.tsx</code> for screen flow and <code>ShoppingScreen.tsx</code> for in-trip interactions.`,
+                },
+              ],
+              callout:
+                `${term('commit', 'commit')} is the moment where user action becomes saved state. If that step is missing, the UI may look right for a second and then drift out of sync.`,
+            },
+          ],
+          quiz: {
+            title: 'Trip flow check',
+            intro: 'These questions test how the journey fits together, not whether you memorized file names.',
+            questions: [
+              {
+                prompt:
+                  `A user taps <span class="term" tabindex="0" role="button" data-tip="${escapeHtml('The primary button that starts shopping mode.') }">Gå til indkøbsliste</span>. What should happen next?`,
+                options: [
+                  'Stay on the store picker and wait for another tap',
+                  'Open the planning screen for the selected store',
+                  'Jump straight to the confirmation step',
+                ],
+                answer: 1,
+                explanation:
+                  'The next stop is planning, because that is where the list gets edited before shopping starts.',
+              },
+              {
+                prompt:
+                  'Why does the app show a confirmation step before ending the trip?',
+                options: [
+                  'So the user can avoid accidentally closing a trip that is not finished yet',
+                  'Because confirmation is the only screen that can save data',
+                  'Because the service worker needs time to wake up',
+                ],
+                answer: 0,
+                explanation:
+                  'The confirmation step is a safety check. It prevents an accidental tap from erasing the user’s place in the trip.',
+              },
+              {
+                prompt:
+                  `Which state is the worst candidate for sharing with the server during an active trip?`,
+                options: [
+                  'Completed trips and store names',
+                  'The current shopping order on this phone',
+                  'Item names that never change',
+                ],
+                answer: 1,
+                explanation:
+                  'The active shopping order is intentionally device-local, so it should not be treated like durable household data.',
+              },
+            ],
+          },
+        },
+        {
+          id: 'actors',
+          index: '02',
+          title: 'Meet the actors',
+          subtitle: 'See who bootstraps the app, who owns the screens, and who guards the edges.',
+          lead:
+            `This codebase is easier to steer once you know the cast. A few files act like the stage crew, and the screen components are the specialists that do one job each.`,
+          screens: [
+            {
+              kind: 'visual',
+              eyebrow: 'Cast list',
+              title: 'The app has a clear hierarchy.',
+              paragraphs: [
+                `The browser starts in <code>main.tsx</code>. That file wraps the app with <code>AuthProvider</code> and <code>ErrorBoundary</code>, then mounts <code>App</code>.`,
+                `Inside <code>App.tsx</code>, each screen module owns one user task: store picking, planning, shopping, settings, and loyalty cards.`,
+              ],
+              visual: `
+                <div class="actors-grid" aria-hidden="true">
+                  <div class="stack">
+                    <div class="actor-card actor-card--main">
+                      <strong>main.tsx</strong>
+                      <span>Launches React, installs global wrappers, and watches for service worker updates.</span>
+                    </div>
+                    <div class="actor-card">
+                      <strong>AuthProvider</strong>
+                      <span>Loads the login state and household membership.</span>
+                    </div>
+                    <div class="actor-card">
+                      <strong>ErrorBoundary</strong>
+                      <span>Catches crashes before the whole app goes blank.</span>
+                    </div>
+                  </div>
+                  <div class="stack">
+                    <div class="actor-card actor-card--screen">
+                      <strong>StoresScreen</strong>
+                      <span>Lets the user choose or create a store.</span>
+                    </div>
+                    <div class="actor-card actor-card--screen">
+                      <strong>PlanningScreen</strong>
+                      <span>Edits the list and keeps the temporary undo state.</span>
+                    </div>
+                    <div class="actor-card actor-card--screen">
+                      <strong>ShoppingScreen</strong>
+                      <span>Checks items off and adds things mid-trip.</span>
+                    </div>
+                  </div>
+                </div>
+              `,
+            },
+            {
+              kind: 'code',
+              eyebrow: 'Bootstrap code',
+              title: 'The root render in <code>main.tsx</code> shows the order of the wrappers.',
+              paragraphs: [
+                `If you want to add a new wrapper around the whole app, this is the place. It is also the best place to understand what loads before the product UI appears.`,
+              ],
+              snippet: {
+                file: 'src/main.tsx',
+                lines: [
+                  "createRoot(document.getElementById('root')!).render(",
+                  '  <StrictMode>',
+                  '    <ErrorBoundary>',
+                  '      <AuthProvider>',
+                  '        <App />',
+                  '      </AuthProvider>',
+                  '    </ErrorBoundary>',
+                  '  </StrictMode>,',
+                  ')',
+                ],
+                explanations: [
+                  'Mount React into the page’s root element.',
+                  'Turn on development checks.',
+                  'Wrap the whole app in the crash guard.',
+                  'Load authentication and household data for every screen.',
+                  'Render the actual product.',
+                  'Close the auth wrapper.',
+                  'Close the crash guard.',
+                  'Close StrictMode.',
+                  'Finish mounting the app.',
+                ],
+              },
+            },
+            {
+              kind: 'visual',
+              eyebrow: 'Division of labor',
+              title: 'Each screen owns one job so the code stays readable.',
+              paragraphs: [
+                `When you are steering AI, this separation is gold. You can say “put the add-store modal in <code>App.tsx</code>” or “change item lookup in <code>PlanningScreen.tsx</code>” instead of hunting through one giant file.`,
+              ],
+              cards: [
+                {
+                  title: 'Global shell',
+                  body: `Use <code>main.tsx</code> for cross-cutting concerns like auth, errors, and update checks.`,
+                },
+                {
+                  title: 'Routing brain',
+                  body: `Use <code>App.tsx</code> for which screen appears and how the trip moves between screens.`,
+                },
+                {
+                  title: 'Feature rooms',
+                  body: `Use each screen component for one domain task, not for the whole app.`,
+                },
+              ],
+              callout:
+                `A good architecture boundary is one where you can describe a file in one sentence and trust that sentence to stay true.`,
+            },
+          ],
+          quiz: {
+            title: 'Actor check',
+            intro: 'These scenarios test where a change belongs, which is the most useful architectural skill here.',
+            questions: [
+              {
+                prompt: 'You need a new wrapper around the whole app for analytics. Where would that go?',
+                options: ['Inside PlanningScreen', 'In main.tsx', 'Inside the store store.ts migration code'],
+                answer: 1,
+                explanation:
+                  'Global wrappers belong in the bootstrap file, because that is where the entire React tree gets mounted.',
+              },
+              {
+                prompt:
+                  'You want a new screen that shows a special summary after checkout. Which file decides when it appears?',
+                options: ['App.tsx', 'domain/learning.ts', 'utils/fuzzy.ts'],
+                answer: 0,
+                explanation:
+                  'App.tsx is the screen switchboard. It decides which screen is visible.',
+              },
+              {
+                prompt:
+                  'A screen crashes and you want the rest of the app to survive. Which actor is designed for that?',
+                options: ['ErrorBoundary', 'normalizeItemName', 'resolveSelectedStoreId'],
+                answer: 0,
+                explanation:
+                  'ErrorBoundary is the crash guard. It catches a render failure and shows a fallback instead of taking down the whole app.',
+              },
+            ],
+          },
+        },
+        {
+          id: 'memory',
+          index: '03',
+          title: 'Local memory first',
+          subtitle: 'See how state lives in the browser, survives reloads, and recovers from old versions.',
+          lead:
+            `The app is not just React state. It also has a browser memory layer, migration logic, and a sync seam so the data can survive reloads and evolve over time.`,
+          screens: [
+            {
+              kind: 'visual',
+              eyebrow: 'The notebook',
+              title: 'There are three places to think about data: memory, storage, and the server.',
+              paragraphs: [
+                `React keeps the live UI in memory. <code>localStorage</code> keeps a snapshot on this browser. The server keeps the shared household version.`,
+                `The app reads from local storage first so the screen can appear fast even when the network is slow.`,
+              ],
+              visual: `
+                <div class="memory-visual" aria-hidden="true">
+                  <div class="memory-card">
+                    <strong>React memory</strong>
+                    <span>The current screen and live interactions.</span>
+                  </div>
+                  <div class="memory-arrow">→</div>
+                  <div class="memory-card memory-card--highlight">
+                    <strong>localStorage</strong>
+                    <span>The browser notebook that survives refreshes.</span>
+                  </div>
+                  <div class="memory-arrow">→</div>
+                  <div class="memory-card">
+                    <strong>Server sync</strong>
+                    <span>Durable household data that can be shared.</span>
+                  </div>
+                </div>
+              `,
+            },
+            {
+              kind: 'code',
+              eyebrow: 'Storage hook',
+              title: '<code>useAppState.ts</code> writes changes immediately and treats server refreshes differently.',
+              paragraphs: [
+                `The difference between <code>commit</code> and <code>replace</code> is subtle but important. One means “the user changed something right now.” The other means “the server sent us a version to adopt.”`,
+              ],
+              snippet: {
+                file: 'src/hooks/useAppState.ts',
+                lines: [
+                  '  function commit(nextState: AppState): void {',
+                  '    if (!persistAppState(nextState)) {',
+                  '      window.alert(STORAGE_QUOTA_MESSAGE)',
+                  '      return',
+                  '    }',
+                  '',
+                  '    setState(nextState)',
+                  '    notifyStateChanged(nextState)',
+                  '  }',
+                  '',
+                  '  function replace(',
+                  '    nextState: AppState,',
+                  '    options?: { serverVersion?: number | null; householdId?: string | null },',
+                  '  ): void {',
+                  '    if (!persistAppState(nextState, {',
+                  '      markDirty: false,',
+                  '      pendingSync: false,',
+                  '      serverVersion: options?.serverVersion ?? appStore.getServerVersion(),',
+                  '      householdId: options?.householdId,',
+                  '    })) {',
+                  '      window.alert(STORAGE_QUOTA_MESSAGE)',
+                  '      return',
+                  '    }',
+                  '',
+                  '    setState(nextState)',
+                  '  }',
+                ],
+                explanations: [
+                  'Define the helper for local user edits.',
+                  'Try to save the new state first.',
+                  'If storage is full, show a warning.',
+                  'Stop instead of pretending the write worked.',
+                  'Close the early return block.',
+                  'Blank line between the two helpers.',
+                  'Update the React state immediately.',
+                  'Tell the sync engine there is new local data.',
+                  'Finish the local-edit helper.',
+                  'Blank line before the server-driven helper.',
+                  'Start the replacement helper.',
+                  'Receive the new state and optional server metadata.',
+                  'The server version and household id travel with the state.',
+                  'Begin the server-driven write.',
+                  'Do not mark this as a user edit.',
+                  'Do not mark it as pending sync either.',
+                  'Reuse the current server version if no new one was passed in.',
+                  'Carry over the household id if one was provided.',
+                  'If persistence fails, warn the user.',
+                  'Stop instead of continuing with a bad write.',
+                  'Close the failure branch.',
+                  'Finish the persistence attempt.',
+                  'Update React state with the replacement version.',
+                  'Close the helper.',
+                ],
+              },
+            },
+            {
+              kind: 'visual',
+              eyebrow: 'Why the guardrails exist',
+              title: 'The storage layer also cleans up old shapes and bad values.',
+              paragraphs: [
+                `The persistence layer does more than save. It validates data, migrates older formats, and normalizes store selection so the app does not break when saved data drifts.`,
+              ],
+              cards: [
+                {
+                  title: 'Schema versioning',
+                  body: `Old envelopes are migrated forward instead of being rejected outright.`,
+                },
+                {
+                  title: 'Runtime validation',
+                  body: `The app checks that what came from storage still matches the model.`,
+                },
+                {
+                  title: 'Quota safety',
+                  body: `If the browser fills up, the user gets an alert instead of a silent failure.`,
+                },
+              ],
+              callout:
+                `If you are debugging a weird persisted state, start in <code>domain/store.ts</code>. That file is the gatekeeper for what counts as valid data.`,
+            },
+          ],
+          quiz: {
+            title: 'Memory check',
+            intro: 'These questions focus on persistence behavior, especially what happens when storage or versions do not line up.',
+            questions: [
+              {
+                prompt: 'What should happen if the browser storage is full when the user edits data?',
+                options: [
+                  'Silently drop the change and keep the UI moving',
+                  'Warn the user that the browser is out of space',
+                  'Delete every trip to make room',
+                ],
+                answer: 1,
+                explanation:
+                  'The app should alert the user so they know the write did not succeed.',
+              },
+              {
+                prompt: 'Which file is the right place for migrating old saved formats?',
+                options: ['domain/store.ts', 'PlanningScreen.tsx', 'LoginScreen.tsx'],
+                answer: 0,
+                explanation:
+                  'The storage layer owns migrations because it is the gatekeeper for saved data.',
+              },
+              {
+                prompt:
+                  'Why does replace() pass markDirty: false when it receives server state?',
+                options: [
+                  'Because the server is not a user edit, so it should not trigger a new pending sync cycle',
+                  'Because replace() does not persist anything',
+                  'Because React refuses to update if markDirty is true',
+                ],
+                answer: 0,
+                explanation:
+                  'A server refresh should update the local cache without pretending that the user made a new edit.',
+              },
+            ],
+          },
+        },
+        {
+          id: 'sync',
+          index: '04',
+          title: 'Household sync and auth',
+          subtitle: 'See the login gate, the household join flow, and how durable data moves between device and server.',
+          lead:
+            `The user signs in with a <span class="term" tabindex="0" role="button" data-tip="${escapeHtml(glossary['magic link'])}">magic link</span>, joins or creates a household, and then the sync engine keeps the durable parts of the app moving in the background.`,
+          screens: [
+            {
+              kind: 'visual',
+              eyebrow: 'The gate',
+              title: 'Login is the front door, and the household is the shared room behind it.',
+              paragraphs: [
+                `After the login gate, <code>HouseholdSetupScreen</code> decides whether the user is creating a household or joining one with a code.`,
+                `The important thing is not the code itself. The code is just a join mechanism; the household is the shared data container.`,
+              ],
+              visual: `
+                <div class="sync-visual" aria-hidden="true">
+                  <div class="sync-card">
+                    <strong>Phone A</strong>
+                    <span>Logs in with a magic link and maybe keeps local data to merge.</span>
+                  </div>
+                  <div class="sync-card sync-card--server">
+                    <strong>Household server</strong>
+                    <span>Stores durable data and version numbers.</span>
+                  </div>
+                  <div class="sync-card sync-card--warning">
+                    <strong>Phone B</strong>
+                    <span>Can join by code, then syncs the same household state.</span>
+                  </div>
+                </div>
+                <div class="sync-badge" style="margin-top:0.9rem">local-only fields stay on the phone</div>
+              `,
+            },
+            {
+              kind: 'code',
+              eyebrow: 'Sync boundary',
+              title: '<code>api/client.ts</code> decides what can leave the phone and how server state gets merged back.',
+              paragraphs: [
+                `This is the seam between device-local UI and durable household data. If you are debugging why something synced or did not sync, this boundary is a great place to inspect.`,
+              ],
+              snippet: {
+                file: 'src/api/client.ts',
+                lines: [
+                  'export function toSyncableState(state: AppState): SyncableState {',
+                  '  const { selectedStoreId, isShopping, currentSequence, list, ...syncable } = state',
+                  '  void selectedStoreId',
+                  '  void isShopping',
+                  '  void currentSequence',
+                  '  void list',
+                  '  return syncable',
+                  '}',
+                  '',
+                  'export function mergeServerStateIntoLocal(localState: AppState, serverState: SyncableState): AppState {',
+                  '  return {',
+                  '    ...localState,',
+                  '    ...serverState,',
+                  '    list: localState.list,',
+                  '    selectedStoreId: resolveSelectedStoreId(serverState.stores, localState.selectedStoreId),',
+                  '    isShopping: localState.isShopping,',
+                  '    currentSequence: localState.currentSequence,',
+                  '  }',
+                  '}',
+                ],
+                explanations: [
+                  'Start by building a payload that can go to the server.',
+                  'Strip out the fields that should stay on this phone.',
+                  'Acknowledge the removed value so the compiler stays happy.',
+                  'Same idea for the shopping flag.',
+                  'Same idea for the in-progress item trail.',
+                  'Same idea for the active list.',
+                  'Return only durable household data.',
+                  'Finish the helper.',
+                  'Blank separator.',
+                  'Start the merge helper.',
+                  'Begin with the local state.',
+                  'Overlay the server’s durable fields.',
+                  'But keep this phone’s active list.',
+                  'Pick a valid selected store if the local choice no longer exists on the server.',
+                  'Keep the local shopping flag.',
+                  'Keep the local in-progress item trail.',
+                  'Return the merged state.',
+                  'Finish the helper.',
+                ],
+              },
+            },
+            {
+              kind: 'visual',
+              eyebrow: 'What actually syncs',
+              title: 'The sync engine is picky on purpose.',
+              paragraphs: [
+                `It debounces writes, waits for the network when needed, and retries conflicts instead of instantly surfacing a modal for every version mismatch.`,
+              ],
+              cards: [
+                {
+                  title: 'Debounced push',
+                  body: `Repeated edits are bundled so the server does not get spammed with every tiny change.`,
+                },
+                {
+                  title: 'Conflict handling',
+                  body: `If the server is ahead, the engine can retry or merge the newer state back in.`,
+                },
+                {
+                  title: 'Error-only indicator',
+                  body: `The visible sync badge only appears when the engine actually has a real error to report.`,
+                },
+              ],
+              callout:
+                `When the UI says “Synk-fejl,” the first questions are: did the request timeout, did the server reject it, or is there a version mismatch? The answer lives in <code>sync/engine.ts</code> and <code>api/client.ts</code>.`,
+            },
+          ],
+          quiz: {
+            title: 'Sync check',
+            intro: 'These questions test how data moves between the phone and the household server.',
+            questions: [
+              {
+                prompt:
+                  'Which helper is supposed to remove device-only fields before sending data to the server?',
+                options: ['toSyncableState()', 'normalizeItemName()', 'appendTripCapped()'],
+                answer: 0,
+                explanation:
+                  'toSyncableState() strips out the local-only fields so only durable household data is synced.',
+              },
+              {
+                prompt:
+                  'If the server sends newer stores but the phone still has an active trip, what should mergeServerStateIntoLocal keep from local state?',
+                options: [
+                  'The active list, shopping flag, and current sequence',
+                  'Only the store names',
+                  'Nothing; always overwrite everything',
+                ],
+                answer: 0,
+                explanation:
+                  'Those active-trip fields are intentionally local so the user does not lose the in-progress shopping session.',
+              },
+              {
+                prompt:
+                  'A user sees the error badge in the store settings header. What is the most likely next place to inspect?',
+                options: ['sync/engine.ts and api/client.ts', 'planningRows sorting only', 'the browser theme file'],
+                answer: 0,
+                explanation:
+                  'The badge reflects sync status, so the engine and API wrapper are the right first stops.',
+              },
+            ],
+          },
+        },
+        {
+          id: 'learning',
+          index: '05',
+          title: 'The route learns',
+          subtitle: 'See how a completed trip reshapes the order of the next one.',
+          lead:
+            `The clever part of the app is not just that it stores a list. It learns a rough store route from the order in which items are checked off, then updates the list order the next time the user shops.`,
+          screens: [
+            {
+              kind: 'visual',
+              eyebrow: 'Learning curve',
+              title: 'Recent trips count more than old ones.',
+              paragraphs: [
+                `A trip that happened yesterday should influence the route more than a trip from six months ago. That is why the learned order is weighted by recency.`,
+                `In plain English: the app treats the most recent evidence as the most trustworthy clue about how this store is laid out.`,
+              ],
+              visual: `
+                <div class="learning-visual" aria-hidden="true">
+                  <div class="bars">
+                    <div class="bar">
+                      <small><strong>Milk</strong><span>seen early in the route</span></small>
+                      <div class="bar-track"><div class="bar-fill" style="width: 18%"></div></div>
+                    </div>
+                    <div class="bar">
+                      <small><strong>Bread</strong><span>middle of the route</span></small>
+                      <div class="bar-track"><div class="bar-fill" style="width: 54%"></div></div>
+                    </div>
+                    <div class="bar">
+                      <small><strong>Eggs</strong><span>late in the route</span></small>
+                      <div class="bar-track"><div class="bar-fill" style="width: 82%"></div></div>
+                    </div>
+                  </div>
+                  <div class="learning-note">
+                    <div class="mini-stat">
+                      <strong>Recency weighting</strong>
+                      <span>Newer trips count more than older ones.</span>
+                    </div>
+                    <div class="mini-stat">
+                      <strong>Normalized index</strong>
+                      <span>Each item gets a position between 0 and 1 inside a trip.</span>
+                    </div>
+                  </div>
+                </div>
+              `,
+            },
+            {
+              kind: 'code',
+              eyebrow: 'Trip completion',
+              title: '<code>completeTrip()</code> saves the route and immediately learns from it.',
+              paragraphs: [
+                `Checkout is not the end of the data flow. It is the point where the app stores the route you just walked and updates the next ordering hint.`,
+              ],
+              snippet: {
+                file: 'src/domain/app-state.ts',
+                lines: [
+                  'export function completeTrip(state: AppState, now = Date.now()): AppState {',
+                  '  const trips =',
+                  '    state.currentSequence.length > 0',
+                  '      ? appendTripCapped(state.trips, {',
+                  "          id: createId('trip'),",
+                  '          storeId: state.selectedStoreId,',
+                  '          completedAt: now,',
+                  '          sequence: [...state.currentSequence],',
+                  '        } satisfies Trip)',
+                  '      : state.trips',
+                  '',
+                  '  const completed = persistWeightedPositions(',
+                  '    {',
+                  '      ...state,',
+                  '      isShopping: false,',
+                  '      currentSequence: [],',
+                  '      trips,',
+                  '    },',
+                  '    now,',
+                  '  )',
+                  '',
+                  '  return {',
+                  '    ...completed,',
+                  '    list: completed.list.filter((listItem) => listItem.storeId !== state.selectedStoreId),',
+                  '  }',
+                  '}',
+                ],
+                explanations: [
+                  'Define the helper that closes a trip.',
+                  'Prepare the new trip list.',
+                  'Only record a trip if the user actually checked items off.',
+                  'Append a new trip record, capped to a history limit.',
+                  'Give the trip a new id.',
+                  'Remember which store it belongs to.',
+                  'Stamp the completion time.',
+                  'Copy the item order from the active trip.',
+                  'Tell TypeScript this shape is a real Trip.',
+                  'Otherwise, keep the old trips unchanged.',
+                  'Blank line before the learning pass.',
+                  'Recalculate learned positions for the stored routes.',
+                  'Start from the old state.',
+                  'Mark shopping mode as over.',
+                  'Clear the temporary item trail.',
+                  'Save the updated trip list.',
+                  'Use the current time for recency weighting.',
+                  'Finish the learning call.',
+                  'Blank line before the return.',
+                  'Return the updated state.',
+                  'Copy the learned state forward.',
+                  'Remove the active list for this store so the next trip starts clean.',
+                  'Close the returned object.',
+                  'Close the helper.',
+                ],
+              },
+            },
+            {
+              kind: 'visual',
+              eyebrow: 'Helpful detail',
+              title: 'Planning also uses fuzzy matching so the app can avoid duplicate items.',
+              paragraphs: [
+                `When the user types something like “milk,” the planner tries to match the existing item name before creating a new one. That keeps the list cleaner and makes the learning signal stronger.`,
+              ],
+              cards: [
+                {
+                  title: 'Normalize names',
+                  body: `Trim spaces and compare the text in a stable way before looking for matches.`,
+                },
+                {
+                  title: 'Find the best match',
+                  body: `Use a similarity score instead of demanding a perfect typed string.`,
+                },
+                {
+                  title: 'Refresh usage history',
+                  body: `When an item is reused, its last-used timestamp gets updated so suggestions stay fresh.`,
+                },
+              ],
+              callout:
+                `This is the kind of feature that feels magical to users but is really just a small amount of careful bookkeeping.`,
+            },
+          ],
+          quiz: {
+            title: 'Route-learning check',
+            intro: 'These scenarios test how the store order changes after checkout.',
+            questions: [
+              {
+                prompt:
+                  'Why do recent trips influence the order more than old trips?',
+                options: [
+                  'Because the app weights newer evidence more heavily',
+                  'Because old trips are deleted immediately',
+                  'Because only the first trip ever matters',
+                ],
+                answer: 0,
+                explanation:
+                  'The route-learning code uses recency weighting so the newest behavior has the strongest say.',
+              },
+              {
+                prompt:
+                  'What should happen to the active shopping list when a trip is completed for a store?',
+                options: [
+                  'Keep it exactly as it was forever',
+                  'Clear the active list for that store and save the trip history',
+                  'Move it to the login screen',
+                ],
+                answer: 1,
+                explanation:
+                  'The list is for the current trip. Once the trip is over, the app stores the history and clears the active version.',
+              },
+              {
+                prompt:
+                  'If you want to reduce duplicate item names in planning, where is the best place to look first?',
+                options: ['PlanningScreen.tsx fuzzy matching', 'ErrorBoundary.tsx', 'main.tsx service worker registration'],
+                answer: 0,
+                explanation:
+                  'PlanningScreen.tsx owns the item lookup and fuzzy matching used when users add or reuse items.',
+              },
+            ],
+          },
+        },
+        {
+          id: 'safety',
+          index: '06',
+          title: 'When things break',
+          subtitle: 'Learn the safety rails: error boundaries, storage warnings, update checks, and fallback UI.',
+          lead:
+            `The app has several small escape hatches. If a render crashes, the <code>ErrorBoundary</code> catches it. If storage fills up, the user gets a warning. If the service worker updates, the app refreshes cleanly.`,
+          screens: [
+            {
+              kind: 'visual',
+              eyebrow: 'Recovery plan',
+              title: 'The app does not rely on one giant try/catch.',
+              paragraphs: [
+                `Instead, different parts of the system own different safety jobs. That way a login error, a storage quota problem, and a render crash each get the right kind of response.`,
+              ],
+              visual: `
+                <div class="safety-visual" aria-hidden="true">
+                  <div class="safety-card shield-card">
+                    <strong>ErrorBoundary</strong>
+                    <span>Catches an unexpected crash and offers a reload button.</span>
+                  </div>
+                  <div class="safety-card shield-card--cool">
+                    <strong>Storage alerts</strong>
+                    <span>Warn when browser quota is full instead of silently losing edits.</span>
+                  </div>
+                  <div class="safety-card">
+                    <strong>Update checks</strong>
+                    <span>The service worker watches for newer versions and reloads controlled tabs.</span>
+                  </div>
+                </div>
+              `,
+            },
+            {
+              kind: 'code',
+              eyebrow: 'Crash guard',
+              title: '<code>ErrorBoundary.tsx</code> turns a crash into a human-readable fallback.',
+              paragraphs: [
+                `This is the last-resort fallback for UI errors. It does not try to be clever; it simply keeps the page from going blank and gives the user a reload button.`,
+              ],
+              snippet: {
+                file: 'src/components/ErrorBoundary.tsx',
+                lines: [
+                  '  render() {',
+                  '    if (this.state.hasError) {',
+                  '      return (',
+                  '        <div className="error-boundary">',
+                  '          <p className="error-boundary-title">Noget gik galt</p>',
+                  '          <p className="error-boundary-text">Der opstod en uventet fejl. Prøv at genindlæse siden.</p>',
+                  '          <button',
+                  '            type="button"',
+                  '            className="btn-primary"',
+                  '            onClick={() => window.location.reload()}',
+                  '          >',
+                  '            Genindlæs',
+                  '          </button>',
+                  '        </div>',
+                  '      )',
+                  '    }',
+                  '',
+                  '    return this.props.children',
+                  '  }',
+                ],
+                explanations: [
+                  'This is the class component’s render method.',
+                  'If React reported a crash, show the fallback UI.',
+                  'Start the fallback return value.',
+                  'Render the error card.',
+                  'Show the title of the crash screen.',
+                  'Tell the user what happened in plain language.',
+                  'Start the reload button.',
+                  'Make it a normal button.',
+                  'Use the primary button style.',
+                  'Reload the page when the user clicks.',
+                  'Open the button element.',
+                  'Button text: reload the app.',
+                  'Close the button.',
+                  'Close the fallback card.',
+                  'Close the return block.',
+                  'If there is no crash, keep rendering the app’s children.',
+                  'Finish the method.',
+                ],
+              },
+            },
+            {
+              kind: 'visual',
+              eyebrow: 'Other safety nets',
+              title: 'Many of the app’s helpers are defensive by design.',
+              paragraphs: [
+                `The settings screen protects loyalty-card uploads, the login screen translates API errors into friendly text, and the service worker refresh logic keeps the app from getting stuck on stale files.`,
+              ],
+              cards: [
+                {
+                  title: 'Quota pressure',
+                  body: `The loyalty card uploader checks for storage limits and asks for a smaller image if needed.`,
+                },
+                {
+                  title: 'Friendly errors',
+                  body: `Login and household screens map low-level failures into simple Danish messages.`,
+                },
+                {
+                  title: 'Screen helper',
+                  body: `${term('wake lock', 'wake lock')} and brightness tweaks keep the loyalty card visible during checkout.`,
+                },
+              ],
+              callout:
+                `When a problem appears, look for the smallest component that owns the failed behavior. The repo is full of small guards like this one.`,
+            },
+          ],
+          quiz: {
+            title: 'Safety check',
+            intro: 'These questions test recovery behavior, not memory of obscure implementation details.',
+            questions: [
+              {
+                prompt: 'A screen crashes while rendering. What should keep the whole app usable?',
+                options: ['ErrorBoundary', 'normalizeItemName()', 'appendTripCapped()'],
+                answer: 0,
+                explanation:
+                  'ErrorBoundary is the crash guard designed for this exact job.',
+              },
+              {
+                prompt:
+                  'A loyalty card image is too large to store. What is the right user-facing response?',
+                options: [
+                  'Show a helpful storage warning and ask for a smaller screenshot',
+                  'Delete the entire household',
+                  'Ignore the upload and say nothing',
+                ],
+                answer: 0,
+                explanation:
+                  'The app should explain the storage limit instead of silently failing.',
+              },
+              {
+                prompt:
+                  'What is the point of the service worker update check in main.tsx?',
+                options: [
+                  'Keep controlled tabs on the latest app version and reload when appropriate',
+                  'Store item names in the database',
+                  'Replace the login system',
+                ],
+                answer: 0,
+                explanation:
+                  'It helps the app stay on a fresh version without asking the user to manually clear cache.',
+              },
+            ],
+          },
+        },
+      ]
+
+      const moduleList = document.getElementById('module-list')
+      const courseNav = document.getElementById('course-nav')
+
+      moduleList.innerHTML = modules
+        .map(
+          (module) => `
+            <section class="chapter" id="${module.id}" data-chapter>
+              <div class="chapter-head">
+                <div>
+                  <p class="eyebrow">${module.index}</p>
+                  <h2>${module.title}</h2>
+                  <p class="chapter-lead">${module.subtitle} ${module.lead}</p>
+                </div>
+                <div class="chapter-meta">
+                  <strong>${module.screens.length} screens + quiz</strong>
+                  <span>${module.id === 'journey' ? 'Start wide, then zoom in.' : 'Each chapter ends with application questions.'}</span>
+                </div>
+              </div>
+              <div class="screen-grid">
+                ${module.screens.map(renderScreen).join('')}
+              </div>
+              ${renderQuiz(module.id, module.quiz)}
+            </section>
+          `,
+        )
+        .join('')
+
+      courseNav.innerHTML = modules
+        .map(
+          (module) => `
+            <button class="nav-button" type="button" data-scroll-target="${module.id}">
+              <span>
+                <span class="nav-index">${module.index}</span>
+                <span class="nav-title">${module.title}</span>
+                <span class="nav-subtitle">${module.subtitle}</span>
+              </span>
+              <span aria-hidden="true">↘</span>
+            </button>
+          `,
+        )
+        .join('')
+
+      function scrollToSection(id) {
+        const target = document.getElementById(id)
+        if (!target) return
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+
+      document.addEventListener('click', (event) => {
+        const scrollButton = event.target.closest('[data-scroll-target]')
+        if (scrollButton) {
+          scrollToSection(scrollButton.dataset.scrollTarget)
+          return
+        }
+
+        const option = event.target.closest('.quiz-option')
+        if (option) {
+          const question = option.closest('[data-question]')
+          if (!question || question.dataset.locked === 'true') return
+
+          const answerIndex = Number(question.dataset.answer)
+          const pickedIndex = Number(option.dataset.option)
+          const feedback = question.querySelector('.question-feedback')
+          const buttons = question.querySelectorAll('.quiz-option')
+          const isCorrect = pickedIndex === answerIndex
+
+          question.dataset.locked = 'true'
+          buttons.forEach((button) => {
+            const index = Number(button.dataset.option)
+            button.disabled = true
+            if (index === answerIndex) button.classList.add('is-correct')
+            if (index === pickedIndex && !isCorrect) button.classList.add('is-wrong')
+            if (index === pickedIndex) button.classList.add('is-picked')
+          })
+
+          feedback.classList.add('is-visible')
+          feedback.innerHTML = isCorrect
+            ? `<strong>Exactly.</strong> ${question.dataset.explanation}`
+            : `<strong>Not quite.</strong> ${question.dataset.explanation}`
+        }
+      })
+
+      const tooltip = document.getElementById('tooltip')
+      let activeTerm = null
+      let hoverTimer = null
+
+      function placeTooltip(target) {
+        const tip = target.dataset.tip
+        if (!tip) return
+
+        tooltip.hidden = false
+        tooltip.textContent = tip
+        tooltip.style.visibility = 'hidden'
+        tooltip.dataset.placement = 'top'
+
+        const rect = target.getBoundingClientRect()
+        const tipRect = tooltip.getBoundingClientRect()
+        const margin = 12
+        let left = rect.left + rect.width / 2 - tipRect.width / 2
+        left = Math.max(12, Math.min(left, window.innerWidth - tipRect.width - 12))
+
+        let top = rect.top - tipRect.height - margin
+        if (top < 12) {
+          top = rect.bottom + margin
+          tooltip.dataset.placement = 'bottom'
+        }
+
+        tooltip.style.left = `${left}px`
+        tooltip.style.top = `${top}px`
+        tooltip.style.visibility = 'visible'
+      }
+
+      function showTerm(target) {
+        if (!target) return
+        if (activeTerm && activeTerm !== target) {
+          activeTerm.classList.remove('term-highlight')
+        }
+        activeTerm = target
+        target.classList.add('term-highlight')
+        placeTooltip(target)
+      }
+
+      function hideTerm() {
+        tooltip.hidden = true
+        tooltip.textContent = ''
+        tooltip.style.visibility = 'hidden'
+        if (activeTerm) {
+          activeTerm.classList.remove('term-highlight')
+          activeTerm = null
+        }
+      }
+
+      document.addEventListener('pointerenter', (event) => {
+        const target = event.target.closest('.term')
+        if (!target) return
+        clearTimeout(hoverTimer)
+        showTerm(target)
+      }, true)
+
+      document.addEventListener('pointerleave', (event) => {
+        const target = event.target.closest('.term')
+        if (!target) return
+        hoverTimer = window.setTimeout(() => {
+          hideTerm()
+        }, 80)
+      }, true)
+
+      document.addEventListener('focusin', (event) => {
+        const target = event.target.closest('.term')
+        if (!target) return
+        showTerm(target)
+      })
+
+      document.addEventListener('focusout', (event) => {
+        const target = event.target.closest('.term')
+        if (!target) return
+        hideTerm()
+      })
+
+      document.addEventListener('click', (event) => {
+        const target = event.target.closest('.term')
+        if (target) {
+          event.stopPropagation()
+          showTerm(target)
+          return
+        }
+
+        if (!event.target.closest('#tooltip')) {
+          hideTerm()
+        }
+      })
+
+      window.addEventListener('scroll', () => {
+        if (activeTerm && !tooltip.hidden) {
+          placeTooltip(activeTerm)
+        }
+      }, true)
+
+      window.addEventListener('resize', () => {
+        if (activeTerm && !tooltip.hidden) {
+          placeTooltip(activeTerm)
+        }
+      })
+
+      const navButtons = [...document.querySelectorAll('.nav-button')]
+      const chapters = [...document.querySelectorAll('[data-chapter]')]
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const navButton = navButtons.find((button) => button.dataset.scrollTarget === entry.target.id)
+            if (!navButton) return
+            if (entry.isIntersecting) {
+              navButtons.forEach((button) => button.classList.remove('is-active'))
+              navButton.classList.add('is-active')
+            }
+          })
+        },
+        { rootMargin: '-20% 0px -60% 0px', threshold: 0.15 },
+      )
+
+      chapters.forEach((chapter) => observer.observe(chapter))
+
+      navButtons[0]?.classList.add('is-active')
+      const heroButton = document.querySelector('[data-scroll-target="journey"]')
+      heroButton?.addEventListener('click', () => scrollToSection('journey'))
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          hideTerm()
+        }
+      })
+    </script>
+  </body>
+</html>

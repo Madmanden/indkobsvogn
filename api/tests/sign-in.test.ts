@@ -35,6 +35,7 @@ class MemoryDatabase implements DatabaseLike {
   users = new Map<string, TableRow>()
   verificationTokens = new Map<string, TableRow>()
   rateLimits = new Map<string, TableRow>()
+  sessions = new Map<string, TableRow>()
 
   prepare(sql: string): PreparedStatementLike {
     return new MemoryStatement(this, sql)
@@ -56,6 +57,12 @@ class MemoryDatabase implements DatabaseLike {
     if (sql.includes('FROM verification_tokens WHERE token = ?')) {
       const token = String(params[0])
       const row = this.verificationTokens.get(token)
+      return row ? ([row] as T[]) : []
+    }
+
+    if (sql.includes('FROM users WHERE id = ?')) {
+      const id = String(params[0])
+      const row = this.users.get(id)
       return row ? ([row] as T[]) : []
     }
 
@@ -109,6 +116,27 @@ class MemoryDatabase implements DatabaseLike {
       return { success: true, changes: 1 }
     }
 
+    if (sql.startsWith('UPDATE verification_tokens SET consumed_at')) {
+      const [consumedAt, token] = params
+      const row = this.verificationTokens.get(String(token))
+      if (row) {
+        row.consumed_at = consumedAt
+        return { success: true, changes: 1 }
+      }
+      return { success: true, changes: 0 }
+    }
+
+    if (sql.startsWith('INSERT INTO sessions')) {
+      const [token, userId, expiresAt, createdAt] = params
+      this.sessions.set(String(token), {
+        token,
+        user_id: userId,
+        expires_at: expiresAt,
+        created_at: createdAt,
+      })
+      return { success: true, changes: 1 }
+    }
+
     return { success: true, changes: 0 }
   }
 }
@@ -147,7 +175,123 @@ describe('sign-in', () => {
       message: 'Kunne ikke sende login-linket lige nu. Prøv igen om lidt.',
     })
     expect(db.users.size).toBe(1)
-    expect(db.verificationTokens.size).toBe(1)
+    expect(db.verificationTokens.size).toBe(2)
     expect(db.rateLimits.size).toBe(1)
+  })
+})
+
+function seedCodeToken(db: MemoryDatabase, email: string, code: string, expiresAt: number): void {
+  const token = `code:${email}:${code}`
+  db.verificationTokens.set(token, {
+    token,
+    email,
+    expires_at: expiresAt,
+    created_at: Date.now(),
+    consumed_at: null,
+  })
+}
+
+describe('verify-code', () => {
+  it('verifies a valid code, consumes the token, and sets a session cookie', async () => {
+    const db = new MemoryDatabase()
+    const expiresAt = Date.now() + 1000 * 60 * 15
+    seedCodeToken(db, 'allowed@example.com', '123456', expiresAt)
+
+    const response = await authRouter.request(
+      '/sign-in/verify-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com', code: '123456' }),
+      },
+      makeEnv(db, 'allowed@example.com'),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ ok: true })
+    const setCookie = response.headers.get('Set-Cookie')
+    expect(setCookie).toBeTruthy()
+    expect(setCookie).toContain('indkobsvogn_session=')
+    expect(db.sessions.size).toBe(1)
+    const consumed = db.verificationTokens.get('code:allowed@example.com:123456')
+    expect(consumed?.consumed_at).not.toBeNull()
+  })
+
+  it('rejects an unknown code', async () => {
+    const db = new MemoryDatabase()
+
+    const response = await authRouter.request(
+      '/sign-in/verify-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com', code: '999999' }),
+      },
+      makeEnv(db, 'allowed@example.com'),
+    )
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toMatchObject({ error: 'invalid_code' })
+    expect(db.sessions.size).toBe(0)
+  })
+
+  it('rejects an expired code', async () => {
+    const db = new MemoryDatabase()
+    seedCodeToken(db, 'allowed@example.com', '123456', Date.now() - 1000)
+
+    const response = await authRouter.request(
+      '/sign-in/verify-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com', code: '123456' }),
+      },
+      makeEnv(db, 'allowed@example.com'),
+    )
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toMatchObject({ error: 'invalid_code' })
+    expect(db.sessions.size).toBe(0)
+  })
+
+  it('rejects malformed code input', async () => {
+    const db = new MemoryDatabase()
+
+    const response = await authRouter.request(
+      '/sign-in/verify-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com', code: '12a456' }),
+      },
+      makeEnv(db, 'allowed@example.com'),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error: 'invalid_code' })
+  })
+
+  it('rate limits after too many attempts', async () => {
+    const db = new MemoryDatabase()
+
+    for (let i = 0; i < 5; i += 1) {
+      await authRouter.request(
+        '/sign-in/verify-code',
+        {
+          method: 'POST',
+          body: JSON.stringify({ email: 'allowed@example.com', code: '000000' }),
+        },
+        makeEnv(db, 'allowed@example.com'),
+      )
+    }
+
+    const response = await authRouter.request(
+      '/sign-in/verify-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com', code: '000000' }),
+      },
+      makeEnv(db, 'allowed@example.com'),
+    )
+
+    expect(response.status).toBe(429)
+    await expect(response.json()).resolves.toMatchObject({ error: 'too_many_requests' })
+    expect(response.headers.get('Retry-After')).toBeTruthy()
   })
 })

@@ -22,6 +22,15 @@ export function createToken(length = 32): string {
   return output
 }
 
+export function createNumericCode(digits = 6): string {
+  const bytes = randomBytes(digits)
+  let output = ''
+  for (const byte of bytes) {
+    output += (byte % 10).toString()
+  }
+  return output
+}
+
 export function createHouseholdCode(): string {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
   const digits = '0123456789'

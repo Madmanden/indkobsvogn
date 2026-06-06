@@ -9,6 +9,7 @@ export interface AuthContextValue {
   household: HouseholdRecord | null
   authError: string | null
   signIn: (email: string) => Promise<SignInResponse>
+  verifySignInCode: (email: string, code: string) => Promise<void>
   signOut: () => Promise<void>
   createHousehold: (state?: HouseholdRecord['state']) => Promise<HouseholdRecord>
   joinHousehold: (code: string) => Promise<HouseholdRecord>

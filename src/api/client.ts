@@ -174,6 +174,18 @@ export async function verifySignIn(token: string): Promise<void> {
   }
 }
 
+export async function verifySignInCode(email: string, code: string): Promise<void> {
+  const response = await requestRaw('/api/auth/sign-in/verify-code', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  })
+
+  if (!response.ok) {
+    const error = (await response.json().catch(() => null)) as { error?: string } | null
+    throw new Error(error?.error ?? 'invalid_code')
+  }
+}
+
 export async function signOut(): Promise<void> {
   await requestRaw('/api/auth/sign-out', { method: 'POST' })
 }

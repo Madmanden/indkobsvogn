@@ -1821,6 +1821,10 @@ a {
   box-shadow: 0 12px 22px rgba(18, 32, 24, 0.08);
 }
 
+.planning-screen .item-row--learned {
+  border-left: 3px solid rgba(74, 122, 90, 0.42);
+}
+
 .planning-screen .item-main {
   padding: 12px 15px;
 }

@@ -307,6 +307,7 @@ describe('getPlanningRows', () => {
         id: 'item-a',
         name: 'A',
         qty: 3,
+        hasLearnedPosition: true,
       },
     ])
   })

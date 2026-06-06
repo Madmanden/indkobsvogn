@@ -340,7 +340,7 @@ export function PlanningScreen({
 
       <section className="list-block items">
         {planningRows.map((item) => (
-          <article key={item.id} className="item-row">
+          <article key={item.id} className={`item-row${item.hasLearnedPosition ? ' item-row--learned' : ''}`}>
             <div className="item-main inline-item-main">
               <div className="item-name-wrap">
                 <input

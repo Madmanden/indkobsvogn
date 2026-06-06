@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Env } from '../lib/runtime'
-import { createToken, createId } from '../lib/crypto'
+import { createToken, createId, createNumericCode } from '../lib/crypto'
 import { normalizeEmail, jsonError, buildSessionCookie, getCookieValue } from '../lib/http'
 import { isEmailAllowed } from '../lib/allowlist'
 import { Repository } from '../lib/repository'
@@ -18,6 +18,10 @@ function signInError(
   message: string,
 ) {
   return jsonError(c, status, error, { message })
+}
+
+function buildCodeTokenKey(email: string, code: string): string {
+  return `code:${email}:${code}`
 }
 
 authRouter.post('/sign-in', async (c) => {
@@ -55,8 +59,10 @@ authRouter.post('/sign-in', async (c) => {
     await repository.createUser(email)
 
     const token = createToken(48)
+    const code = createNumericCode(6)
     const expiresAt = Date.now() + 1000 * 60 * 15
     await repository.saveVerificationToken(token, email, expiresAt)
+    await repository.saveVerificationToken(buildCodeTokenKey(email, code), email, expiresAt)
 
     const apiUrl = new URL(c.req.url).origin
 
@@ -65,6 +71,7 @@ authRouter.post('/sign-in', async (c) => {
         apiUrl,
         email,
         token,
+        code,
         resendApiKey: c.env.RESEND_API_KEY,
         fromEmail: c.env.FROM_EMAIL,
       })
@@ -123,6 +130,57 @@ authRouter.get('/sign-in/verify', async (c) => {
 
   const frontendUrl = c.env.FRONTEND_URL?.trim() || new URL(c.req.url).origin
   return c.redirect(frontendUrl)
+})
+
+authRouter.post('/sign-in/verify-code', async (c) => {
+  try {
+    await ensureDatabaseReady(c.env.DB)
+
+    const body = (await c.req.json().catch(() => null)) as { email?: string; code?: string } | null
+    const email = body?.email ? normalizeEmail(body.email) : ''
+    const code = (body?.code ?? '').trim()
+
+    if (!email || !/^\d{6}$/.test(code)) {
+      return signInError(c, 400, 'invalid_code', 'Indtast den 6-cifrede kode fra mailen.')
+    }
+
+    const rateLimit = await checkRateLimit(c.env.DB, `verify:${email}`)
+    if (!rateLimit.allowed) {
+      const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
+      c.header('Retry-After', String(retryAfter))
+      return signInError(
+        c,
+        429,
+        'too_many_requests',
+        'For mange forsøg. Vent et øjeblik og prøv igen.',
+      )
+    }
+    await recordAttempt(c.env.DB, `verify:${email}`)
+
+    const repository = new Repository(c.env.DB)
+    const verificationToken = await repository.consumeVerificationToken(buildCodeTokenKey(email, code))
+    if (!verificationToken || verificationToken.email !== email) {
+      return signInError(c, 401, 'invalid_code', 'Koden er forkert eller udløbet.')
+    }
+
+    if (!isEmailAllowed(verificationToken.email, c.env.ALLOWED_EMAILS)) {
+      return signInError(c, 403, 'email_not_allowed', 'Den e-mail er ikke på tilladelseslisten.')
+    }
+
+    const user = await repository.createUser(verificationToken.email)
+    const sessionToken = createId('session')
+    const session = await repository.createSession(user.id, sessionToken, createSessionExpiry())
+
+    c.header(
+      'Set-Cookie',
+      createSessionCookie(session.token, c.req.url, session.expiresAt, c.env.SESSION_COOKIE_NAME),
+    )
+
+    return c.json({ ok: true })
+  } catch (error) {
+    console.error('Verify code failed:', error)
+    return signInError(c, 503, 'verify_failed', 'Kunne ikke bekræfte koden lige nu. Prøv igen om lidt.')
+  }
 })
 
 authRouter.post('/sign-out', async (c) => {

@@ -76,6 +76,7 @@ export async function sendMagicLink(options: {
   apiUrl: string
   email: string
   token: string
+  code: string
   resendApiKey?: string
   fromEmail?: string
 }): Promise<void> {
@@ -87,6 +88,14 @@ export async function sendMagicLink(options: {
     return
   }
 
+  const html = `
+    <p>Log ind på Indkøbsvogn:</p>
+    <p><a href="${verifyUrl}">${verifyUrl}</a></p>
+    <p>Eller indtast denne kode i appen:</p>
+    <p style="font-size:24px;font-weight:bold;letter-spacing:4px;">${options.code}</p>
+    <p>Koden udløber om 15 minutter.</p>
+  `
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -96,8 +105,8 @@ export async function sendMagicLink(options: {
     body: JSON.stringify({
       from: options.fromEmail ?? 'Indkøbsvogn <no-reply@indkobsvogn.local>',
       to: options.email,
-      subject: 'Your Indkøbsvogn login link',
-      html: `<p>Open this link to sign in:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
+      subject: 'Dit login til Indkøbsvogn',
+      html,
     }),
   })
 

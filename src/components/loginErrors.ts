@@ -6,6 +6,8 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   too_many_requests: 'Der er sendt for mange login-forsøg. Vent et øjeblik og prøv igen.',
   mail_delivery_failed: 'Kunne ikke sende login-linket lige nu. Prøv igen om lidt.',
   sign_in_failed: 'Kunne ikke oprette login-linket lige nu. Prøv igen om lidt.',
+  invalid_code: 'Koden er forkert eller udløbet.',
+  verify_failed: 'Kunne ikke bekræfte koden lige nu. Prøv igen om lidt.',
 }
 
 export function getLoginErrorMessage(error: unknown): string {

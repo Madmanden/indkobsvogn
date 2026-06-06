@@ -37,6 +37,7 @@ function App() {
     household,
     authError,
     signIn,
+    verifySignInCode,
     signOut,
     createHousehold: createHouseholdForUser,
     joinHousehold: joinHouseholdForUser,
@@ -205,6 +206,10 @@ function App() {
     return signIn(email)
   }
 
+  async function handleVerifyCode(email: string, code: string): Promise<void> {
+    await verifySignInCode(email, code)
+  }
+
   async function handleSignOut(): Promise<void> {
     await signOut()
   }
@@ -226,7 +231,7 @@ function App() {
     return (
       <main className="app">
         <div className="shell">
-          <LoginScreen onSignIn={handleSignIn} authError={authError} />
+          <LoginScreen onSignIn={handleSignIn} onVerifyCode={handleVerifyCode} authError={authError} />
         </div>
       </main>
     )

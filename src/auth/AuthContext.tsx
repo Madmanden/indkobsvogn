@@ -1,6 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { HouseholdMeResponse, HouseholdRecord, SignInResponse } from '../api/client'
-import { createHousehold, getHouseholdMe, joinHousehold, signIn as apiSignIn, signOut as apiSignOut } from '../api/client'
+import {
+  createHousehold,
+  getHouseholdMe,
+  joinHousehold,
+  signIn as apiSignIn,
+  signOut as apiSignOut,
+  verifySignInCode as apiVerifySignInCode,
+} from '../api/client'
 import { AuthContext } from './context'
 
 function handleSessionLoadError(error: unknown, setAuthError: (value: string | null) => void): boolean {
@@ -115,6 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return apiSignIn(email)
   }
 
+  async function verifySignInCode(email: string, code: string): Promise<void> {
+    await apiVerifySignInCode(email, code)
+    await refresh()
+  }
+
   async function signOut(): Promise<void> {
     await apiSignOut()
     setStatus('unauthenticated')
@@ -146,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         household,
         authError,
         signIn,
+        verifySignInCode,
         signOut,
         createHousehold: createHouseholdForUser,
         joinHousehold: joinHouseholdForUser,

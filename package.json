@@ -7,8 +7,10 @@
     "api"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "bun run dev:pages",
     "dev:app": "vite",
+    "dev:pages": "bun run build && npx wrangler pages dev dist",
+    "deploy:pages": "./scripts/deploy-pages.sh",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run && bun --cwd api test",

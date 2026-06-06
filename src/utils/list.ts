@@ -4,6 +4,7 @@ export interface PlanningRow {
   id: string
   name: string
   qty: number
+  hasLearnedPosition: boolean
 }
 
 export function getPlanningRows(state: AppState): PlanningRow[] {
@@ -20,6 +21,7 @@ export function getPlanningRows(state: AppState): PlanningRow[] {
         id: item.id,
         name: item.name,
         qty: listItem.quantity,
+        hasLearnedPosition: listItem.weightedPosition < 1,
       }
     })
     .filter((entry): entry is PlanningRow => entry !== null)
