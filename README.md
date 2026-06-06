@@ -1,36 +1,36 @@
 # Indkøbsvogn
 
-Indkøbsvogn er en dansk, lokal-først indkøbsapp til husstande, der vil have en mere rolig og intelligent måde at planlægge indkøb på. Appen lærer rækkefølgen i hver butik, holder den aktive tur lokal på telefonen og synkroniserer de varige husstandsdata i baggrunden.
+Indkøbsvogn is a Danish, local-first grocery app for households that want calmer, smarter shopping. It learns the route through each store, keeps the active shopping trip on the phone, and syncs durable household data quietly in the background.
 
-## Derfor Indkøbsvogn
+## Why Indkøbsvogn
 
-- Den aktive indkøbstur bliver på telefonen, så du kan bruge appen hurtigt i butikken uden at vente på sync
-- Appen lærer varernes rækkefølge ud fra afsluttede ture, så den bliver bedre over tid
-- Fælles husstandsdata synkroniseres automatisk med magic links og en 6-cifret kode
-- Hver butik har sit eget flow, sin egen læring og sin egen historik
-- Appen er offline-først og optimeret til mobil brug
+- Active shopping trips stay on the phone, so the app stays fast in the store without waiting for sync
+- Item order improves over time from completed trips, with no manual aisle setup
+- Household data syncs automatically with magic links and a 6-digit code
+- Each store has its own list flow, learned order, trip history, and loyalty card
+- The app is offline-first and designed for one-handed mobile use
 
-## Det kan den
+## Features
 
-- Butiksbevidst planlægning og indkøb
-- Automatisk læring af varernes rækkefølge fra gennemførte ture
-- Telefon-først redigering, hvor den aktive liste forbliver lokal på telefonen
-- Husstandslogin med magic links og 6-cifret kode
-- Loyalitetskort pr. butik
-- Hurtig brug offline og på langsomme forbindelser
+- Store-aware planning and shopping flows
+- Automatic route learning from completed trips
+- Phone-first editing, where the active list remains local to the device
+- Household sign-in with magic links and a 6-digit code
+- Per-store loyalty cards, including quick access during planning and after checkout
+- Fast use offline and on slow connections
 
-## Kom i gang
+## Getting Started
 
 ```bash
 bun install
 bun run dev
 ```
 
-Åbn den lokale URL, som udviklingsserveren viser i terminalen.
+Open the local URL shown by the development server.
 
-Hvis du vil bruge lokal levering af magic links, så kopiér `.dev.vars.example` til `.dev.vars` og sæt `RESEND_API_KEY`.
+To enable local delivery of magic links, copy `.dev.vars.example` to `.dev.vars` and set `RESEND_API_KEY`.
 
-## Byg og test
+## Build And Test
 
 ```bash
 bun run build
@@ -38,13 +38,13 @@ bun run test
 bun run preview
 ```
 
-## Dokumentation
+## Documentation
 
-- [Nuværende implementering](docs/CURRENT.md)
-- [Produktstrategi](docs/STRATEGY.md)
-- [V2 referencearkitektur](docs/PLAN_V2.md)
-- [Handoff-noter](docs/HANDOFF.md)
-- [Verifikationsopgaver](docs/tasks.md)
+- [Current implementation](docs/CURRENT.md)
+- [Product strategy](docs/STRATEGY.md)
+- [V2 reference architecture](docs/PLAN_V2.md)
+- [Handoff notes](docs/HANDOFF.md)
+- [Verification tasks](docs/tasks.md)
 
 ## Stack
 
@@ -52,4 +52,4 @@ bun run preview
 - Vite 8
 - TypeScript
 - Plain CSS
-- Hono i `api/`
+- Hono in `api/`
