@@ -1,16 +1,25 @@
 # Indkøbsvogn
 
-Indkøbsvogn er en dansk, lokal-først indkøbsplanlægger, der lærer din rute gennem butikken og synkroniserer varige husstandsdata i baggrunden, mens den aktive tur forbliver lokal på telefonen.
+Indkøbsvogn er en dansk, lokal-først indkøbsapp til husstande, der vil have en mere rolig og intelligent måde at planlægge indkøb på. Appen lærer rækkefølgen i hver butik, holder den aktive tur lokal på telefonen og synkroniserer de varige husstandsdata i baggrunden.
 
-## Hvad den gør
-- Butiksbevidst planlægnings- og indkøbsflow
-- Lærer varernes rækkefølge ud fra afsluttede ture
+## Derfor Indkøbsvogn
+
+- Den aktive indkøbstur bliver på telefonen, så du kan bruge appen hurtigt i butikken uden at vente på sync
+- Appen lærer varernes rækkefølge ud fra afsluttede ture, så den bliver bedre over tid
+- Fælles husstandsdata synkroniseres automatisk med magic links og en 6-cifret kode
+- Hver butik har sit eget flow, sin egen læring og sin egen historik
+- Appen er offline-først og optimeret til mobil brug
+
+## Det kan den
+
+- Butiksbevidst planlægning og indkøb
+- Automatisk læring af varernes rækkefølge fra gennemførte ture
+- Telefon-først redigering, hvor den aktive liste forbliver lokal på telefonen
 - Husstandslogin med magic links og 6-cifret kode
-- Telefon-først redigering af ture: den igangværende indkøbsliste forbliver lokal, mens butikker/varer/afsluttede ture synkroniseres
 - Loyalitetskort pr. butik
-- Offline-først, mobilvenlig brugerflade
+- Hurtig brug offline og på langsomme forbindelser
 
-## Hurtig start
+## Kom i gang
 
 ```bash
 bun install
@@ -19,7 +28,7 @@ bun run dev
 
 Åbn den lokale URL, som udviklingsserveren viser i terminalen.
 
-Hvis du vil have lokal levering af magic links, så kopiér `.dev.vars.example` til `.dev.vars` og sæt `RESEND_API_KEY`.
+Hvis du vil bruge lokal levering af magic links, så kopiér `.dev.vars.example` til `.dev.vars` og sæt `RESEND_API_KEY`.
 
 ## Byg og test
 
