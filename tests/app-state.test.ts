@@ -6,6 +6,7 @@ import {
   reorderList,
   startTrip,
 } from '../src/domain/app-state'
+import { UNLEARNED_POSITION } from '../src/domain/learning'
 import type { AppState, Trip } from '../src/domain/models'
 
 function makeState(trips: Trip[] = []): AppState {
@@ -42,7 +43,7 @@ function makeState(trips: Trip[] = []): AppState {
         storeId: 'store-1',
         quantity: 1,
         addedAt: 1,
-        weightedPosition: 1,
+        weightedPosition: UNLEARNED_POSITION,
         manualPosition: -1,
       },
       {
@@ -50,7 +51,7 @@ function makeState(trips: Trip[] = []): AppState {
         storeId: 'store-1',
         quantity: 1,
         addedAt: 2,
-        weightedPosition: 1,
+        weightedPosition: UNLEARNED_POSITION,
         manualPosition: -1,
       },
     ],
@@ -111,7 +112,7 @@ describe('reorderList', () => {
       storeId: 'store-2',
       quantity: 1,
       addedAt: 3,
-      weightedPosition: 1,
+      weightedPosition: UNLEARNED_POSITION,
       manualPosition: -1,
     }
     const state = {
@@ -123,9 +124,7 @@ describe('reorderList', () => {
 
     const reordered = reorderList(state, ['item-b', 'item-a'])
 
-    expect(
-      reordered.list.find((entry) => entry.storeId === 'store-2'),
-    ).toEqual(otherStoreItem)
+    expect(reordered.list.find((entry) => entry.storeId === 'store-2')).toEqual(otherStoreItem)
   })
 })
 
@@ -156,7 +155,6 @@ describe('startTrip', () => {
     expect(started.trips[0]?.storeId).toBe('store-1')
     expect(started.trips[0]?.completedAt).toBe(1000)
     expect(started.trips[0]?.sequence).toEqual(['item-b', 'item-a'])
-
     expect(started.list.every((entry) => entry.manualPosition === -1)).toBe(true)
     expect(started.list.find((entry) => entry.itemId === 'item-b')?.weightedPosition).toBe(0)
     expect(started.list.find((entry) => entry.itemId === 'item-a')?.weightedPosition).toBe(1)
@@ -175,7 +173,7 @@ describe('startTrip', () => {
             storeId: 'store-2',
             quantity: 1,
             addedAt: 3,
-            weightedPosition: 1,
+            weightedPosition: UNLEARNED_POSITION,
             manualPosition: -1,
           },
         ],
@@ -186,7 +184,9 @@ describe('startTrip', () => {
     const started = startTrip(state, 1000)
 
     expect(started.trips[0]?.sequence).toEqual(['item-b', 'item-a'])
-    expect(started.list.find((entry) => entry.itemId === 'item-c')?.weightedPosition).toBe(1)
+    expect(started.list.find((entry) => entry.itemId === 'item-c')?.weightedPosition).toBe(
+      UNLEARNED_POSITION,
+    )
     expect(started.list.find((entry) => entry.itemId === 'item-c')?.manualPosition).toBe(-1)
   })
 })
@@ -226,7 +226,7 @@ describe('completeTrip', () => {
           storeId: 'store-2',
           quantity: 1,
           addedAt: 3,
-          weightedPosition: 1,
+          weightedPosition: UNLEARNED_POSITION,
           manualPosition: -1,
         },
       ],
@@ -283,7 +283,7 @@ describe('completeTrip', () => {
             storeId: 'store-2',
             quantity: 1,
             addedAt: 3,
-            weightedPosition: 1,
+            weightedPosition: UNLEARNED_POSITION,
             manualPosition: 4,
           },
         ],
@@ -336,35 +336,45 @@ describe('completeTrip', () => {
           storeId: 'store-1',
           quantity: 1,
           addedAt: 1,
-          weightedPosition: 1,
+          weightedPosition: UNLEARNED_POSITION,
+          manualPosition: -1,
         },
         {
           itemId: 'item-b',
           storeId: 'store-1',
           quantity: 1,
           addedAt: 2,
-          weightedPosition: 1,
+          weightedPosition: UNLEARNED_POSITION,
+          manualPosition: -1,
         },
         {
           itemId: 'item-a',
           storeId: 'store-2',
           quantity: 1,
           addedAt: 3,
-          weightedPosition: 1,
+          weightedPosition: UNLEARNED_POSITION,
+          manualPosition: -1,
         },
         {
           itemId: 'item-b',
           storeId: 'store-2',
           quantity: 1,
           addedAt: 4,
-          weightedPosition: 1,
+          weightedPosition: UNLEARNED_POSITION,
+          manualPosition: -1,
         },
       ],
     }
 
     const persisted = persistWeightedPositions(state, 1000)
 
-    expect(persisted.list.find((item) => item.itemId === 'item-a' && item.storeId === 'store-1')?.weightedPosition).toBe(0)
-    expect(persisted.list.find((item) => item.itemId === 'item-a' && item.storeId === 'store-2')?.weightedPosition).toBe(1)
+    expect(
+      persisted.list.find((item) => item.itemId === 'item-a' && item.storeId === 'store-1')
+        ?.weightedPosition,
+    ).toBe(0)
+    expect(
+      persisted.list.find((item) => item.itemId === 'item-a' && item.storeId === 'store-2')
+        ?.weightedPosition,
+    ).toBe(1)
   })
 })
