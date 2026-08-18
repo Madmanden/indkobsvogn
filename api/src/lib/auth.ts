@@ -90,10 +90,10 @@ export async function sendMagicLink(options: {
 
   const html = `
     <p>Log ind på Indkøbsvogn:</p>
-    <p><a href="${verifyUrl}">${verifyUrl}</a></p>
-    <p>Eller indtast denne kode i appen:</p>
+    <p><a href="${verifyUrl}">Log ind på denne enhed</a></p>
+    <p><strong>Bruger du appen på din telefon?</strong> Åbn Indkøbsvogn-appen og indtast i stedet denne kode:</p>
     <p style="font-size:24px;font-weight:bold;letter-spacing:4px;">${options.code}</p>
-    <p>Koden udløber om 15 minutter.</p>
+    <p>Linket åbner kun i en browser på den enhed, hvor du har anmodt om det. Koden og linket udløber om 15 minutter.</p>
   `
 
   const response = await fetch('https://api.resend.com/emails', {
