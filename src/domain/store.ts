@@ -124,11 +124,13 @@ function sanitizeState(state: AppState): AppState {
     ...state,
     stores: normalizedStores,
     selectedStoreId,
+    sortMode: state.sortMode ?? 'learned',
     items: state.items.filter((item) => item.defaultQuantity > 0),
     list: state.list
       .filter((listItem) => listItem.quantity > 0)
       .map((listItem) => ({
         ...listItem,
+        manualPosition: listItem.manualPosition ?? -1,
         storeId: validStoreIds.has(listItem.storeId) ? listItem.storeId : selectedStoreId,
       })),
     trips: state.trips.map((trip) => ({
@@ -160,6 +162,7 @@ function migratePersistedEnvelope(parsed: unknown): PersistedEnvelope | null {
       trips: rawState.trips,
       isShopping: rawState.isShopping,
       currentSequence: rawState.currentSequence,
+      sortMode: 'learned',
     }
 
     return {
@@ -174,6 +177,7 @@ function migratePersistedEnvelope(parsed: unknown): PersistedEnvelope | null {
   if (envelopeVersion === 2 && isLegacyAppStateV2(rawState)) {
     const migrated: AppState = {
       ...rawState,
+      sortMode: 'learned',
       stores: rawState.stores.map((store) => ({
         ...store,
         loyaltyCardScope: 'global',
@@ -196,9 +200,11 @@ function migratePersistedEnvelope(parsed: unknown): PersistedEnvelope | null {
 
     const migrated: AppState = {
       ...rawState,
+      sortMode: 'learned',
       list: rawState.list.map((listItem) => ({
         ...listItem,
         storeId: fallbackStoreId,
+        manualPosition: -1,
       })),
       trips: rawState.trips.map((trip) => ({
         ...trip,
