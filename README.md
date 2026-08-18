@@ -2,6 +2,8 @@
 
 Indkøbsvogn is a Danish, local-first grocery planner that learns your route through each store. The active shopping trip stays on the phone while durable household data syncs quietly in the background.
 
+**Case study:** [christianholmdev.dk/projects/indkobsvogn](https://christianholmdev.dk/projects/indkobsvogn/)
+
 > **Public showcase mirror.** This repository mirrors the shared application/API code from the private canonical production repository. Production Cloudflare configuration, database identifiers, deployment scripts and real environment values are intentionally omitted.
 
 ## What it does
