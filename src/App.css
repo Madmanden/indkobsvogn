@@ -356,6 +356,18 @@ a {
   background: var(--danger);
 }
 
+.offline-banner {
+  display: block;
+  padding: 8px 16px;
+  margin: 8px 16px;
+  border-radius: 10px;
+  background: rgba(255, 184, 87, 0.16);
+  border: 1px solid rgba(255, 184, 87, 0.34);
+  color: #7a5508;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .conflict-backdrop {
   position: fixed;
   inset: 0;
@@ -1806,6 +1818,8 @@ a {
 
 .planning-screen .list-block.items {
   padding-top: 8px;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .planning-screen .autocomplete-box {
@@ -1814,19 +1828,97 @@ a {
 }
 
 .planning-screen .item-row {
+  display: flex;
+  align-items: stretch;
   margin-bottom: 10px;
   border-radius: 12px;
   border-color: rgba(22, 32, 25, 0.08);
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 12px 22px rgba(18, 32, 24, 0.08);
+  overflow: hidden;
 }
 
 .planning-screen .item-row--learned {
-  border-left: 3px solid rgba(74, 122, 90, 0.42);
+  position: relative;
+  border-left: none;
+}
+
+.planning-screen .item-row--learned::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: rgba(74, 122, 90, 0.42);
+  pointer-events: none;
+}
+
+.planning-screen .item-row--dragging {
+  position: relative;
+  z-index: 1;
+  opacity: 0.6;
+  border-color: rgba(74, 122, 90, 0.55);
+  box-shadow: 0 18px 32px rgba(18, 32, 24, 0.2);
+}
+
+.planning-screen .item-row--snap {
+  animation: snap-pulse 200ms ease;
+}
+
+@keyframes snap-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.98);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.planning-screen .header-block .meta-manual {
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: rgba(246, 251, 243, 0.66);
+}
+
+.drag-handle {
+  width: 44px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-light);
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  background: rgba(109, 150, 112, 0.12);
+}
+
+.item-row--dragging .drag-handle {
+  cursor: grabbing;
+}
+
+.drag-handle-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 .planning-screen .item-main {
+  flex: 1;
   padding: 12px 15px;
+  overflow: hidden;
 }
 
 .planning-screen .item-name {
@@ -1976,6 +2068,49 @@ a {
   .planning-screen .header-block .meta-count,
   .shopping-screen .header-block .meta-count {
     font-size: 0.92rem;
+  }
+
+  .planning-screen .drag-handle {
+    width: 36px;
+  }
+
+  .planning-screen .item-main {
+    padding: 12px 8px;
+    gap: 4px;
+  }
+
+  .planning-screen .item-name-wrap {
+    gap: 2px;
+  }
+
+  .planning-screen .item-name-edit-hint {
+    display: none;
+  }
+
+  .planning-screen .item-actions {
+    gap: 4px;
+  }
+
+  .planning-screen .qty-stepper {
+    width: 26px;
+    height: 26px;
+    font-size: 0.9rem;
+  }
+
+  .planning-screen .item-qty-input {
+    width: 24px;
+    height: 26px;
+    font-size: 0.82rem;
+  }
+
+  .planning-screen .item-delete {
+    width: 22px;
+    height: 22px;
+  }
+
+  .planning-screen .item-delete-icon {
+    width: 14px;
+    height: 14px;
   }
 }
 
