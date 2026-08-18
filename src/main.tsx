@@ -3,10 +3,13 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext'
+import { isLoginInProgress } from './auth/loginDraft'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
+declare const __SW_VERSION__: string
+
 const SERVICE_WORKER_UPDATE_INTERVAL_MS = 5 * 60 * 1000
-const SERVICE_WORKER_VERSION = '4'
+const SERVICE_WORKER_VERSION = __SW_VERSION__
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -40,6 +43,7 @@ if ('serviceWorker' in navigator) {
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!hadController || isReloadingForUpdate) return
+      if (isLoginInProgress()) return
       isReloadingForUpdate = true
       window.location.reload()
     })
