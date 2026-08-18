@@ -7,7 +7,10 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   mail_delivery_failed: 'Kunne ikke sende login-linket lige nu. Prøv igen om lidt.',
   sign_in_failed: 'Kunne ikke oprette login-linket lige nu. Prøv igen om lidt.',
   invalid_code: 'Koden er forkert eller udløbet.',
+  invalid_token: 'Login-linket er udløbet eller allerede brugt. Send en ny mail.',
   verify_failed: 'Kunne ikke bekræfte koden lige nu. Prøv igen om lidt.',
+  request_timeout: 'Kunne ikke få kontakt med serveren lige nu. Prøv igen om lidt.',
+  network_error: 'Kunne ikke få kontakt med serveren. Tjek din forbindelse og prøv igen.',
 }
 
 export function getLoginErrorMessage(error: unknown): string {
@@ -15,8 +18,8 @@ export function getLoginErrorMessage(error: unknown): string {
     const code = error.message
     const responseMessage = (error as ApiErrorLike).responseMessage
 
-    if (code.startsWith('request_timeout:')) {
-      return 'Kunne ikke få kontakt med serveren lige nu. Prøv igen om lidt.'
+    if (code.startsWith('request_timeout:') || code.startsWith('network_error:')) {
+      return LOGIN_ERROR_MESSAGES[code.startsWith('request_timeout:') ? 'request_timeout' : 'network_error']
     }
 
     if (code in LOGIN_ERROR_MESSAGES) {
