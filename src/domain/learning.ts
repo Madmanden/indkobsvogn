@@ -1,4 +1,5 @@
 import type { ListItem, Trip } from './models'
+import { createId } from '../utils/id'
 
 const DEFAULT_WEIGHTED_POSITION = 1
 const MS_PER_DAY = 1000 * 60 * 60 * 24
@@ -35,6 +36,19 @@ export function getLearnedPosition(
   }
 
   return weightSum > 0 ? weightedTotal / weightSum : DEFAULT_WEIGHTED_POSITION
+}
+
+export function createSyntheticTrip(
+  itemIds: string[],
+  storeId: string,
+  now = Date.now(),
+): Trip {
+  return {
+    id: createId('trip-synthetic'),
+    storeId,
+    completedAt: now,
+    sequence: [...itemIds],
+  }
 }
 
 export function recalculateWeightedPositions(
