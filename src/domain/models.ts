@@ -47,4 +47,4 @@ export interface AppState {
   sortMode: 'learned' | 'manual'
 }
 
-export type SyncableState = Omit<AppState, 'selectedStoreId' | 'isShopping' | 'currentSequence' | 'list'>
+export type SyncableState = Pick<AppState, 'stores' | 'items' | 'trips'>
