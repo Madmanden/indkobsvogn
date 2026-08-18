@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getLoginErrorMessage } from '../src/components/loginErrors'
+import { ApiError } from '../src/api/client'
 
 describe('getLoginErrorMessage', () => {
   it('maps rate-limit failures to a friendly message', () => {
@@ -18,6 +19,24 @@ describe('getLoginErrorMessage', () => {
   it('treats request timeouts as a server connectivity problem', () => {
     expect(getLoginErrorMessage(new Error('request_timeout:/api/auth/sign-in'))).toBe(
       'Kunne ikke få kontakt med serveren lige nu. Prøv igen om lidt.',
+    )
+  })
+
+  it('treats typed ApiError timeouts as a server connectivity problem', () => {
+    expect(getLoginErrorMessage(new ApiError('request_timeout'))).toBe(
+      'Kunne ikke få kontakt med serveren lige nu. Prøv igen om lidt.',
+    )
+  })
+
+  it('maps network errors to a connectivity message', () => {
+    expect(getLoginErrorMessage(new ApiError('network_error', { message: 'network_error:/api/household/me' }))).toBe(
+      'Kunne ikke få kontakt med serveren. Tjek din forbindelse og prøv igen.',
+    )
+  })
+
+  it('maps an invalid or expired magic-link token', () => {
+    expect(getLoginErrorMessage(new Error('invalid_token'))).toBe(
+      'Login-linket er udløbet eller allerede brugt. Send en ny mail.',
     )
   })
 })
