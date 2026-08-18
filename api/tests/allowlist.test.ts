@@ -29,7 +29,7 @@ class MemoryStatement implements PreparedStatementLike {
     return { results: this.db.query<T>(this.sql, this.params) }
   }
 
-  async run(): Promise<{ success: boolean; changes?: number }> {
+  async run(): Promise<{ success: boolean; changes?: number; meta?: { changes?: number } }> {
     return this.db.execute(this.sql, this.params)
   }
 }
@@ -71,23 +71,23 @@ class MemoryDatabase implements DatabaseLike {
     return []
   }
 
-  async execute(sql: string, params: unknown[]): Promise<{ success: boolean; changes?: number }> {
+  async execute(sql: string, params: unknown[]): Promise<{ success: boolean; changes?: number; meta?: { changes?: number } }> {
     if (sql.startsWith('INSERT INTO users')) {
       const [id, email, createdAt] = params
       this.users.set(String(id), { id, email, created_at: createdAt })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('INSERT INTO sessions')) {
       const [token, userId, expiresAt, createdAt] = params
       this.sessions.set(String(token), { token, user_id: userId, expires_at: expiresAt, created_at: createdAt })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('DELETE FROM sessions')) {
       const [token] = params
       const changed = this.sessions.delete(String(token)) ? 1 : 0
-      return { success: true, changes: changed }
+      return { success: true, meta: { changes: changed } }
     }
 
     if (sql.startsWith('INSERT INTO verification_tokens')) {
@@ -99,18 +99,18 @@ class MemoryDatabase implements DatabaseLike {
         created_at: createdAt,
         consumed_at: null,
       })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('UPDATE verification_tokens SET consumed_at = ?')) {
       const [consumedAt, token] = params
       const row = this.verificationTokens.get(String(token))
-      if (!row) return { success: true, changes: 0 }
+      if (!row) return { success: true, meta: { changes: 0 } }
       row.consumed_at = consumedAt
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
-    return { success: true, changes: 0 }
+    return { success: true, meta: { changes: 0 } }
   }
 }
 
@@ -179,4 +179,3 @@ describe('email allowlist', () => {
     expect(db.sessions.has('session_1')).toBe(false)
   })
 })
-
