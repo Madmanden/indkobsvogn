@@ -25,20 +25,30 @@ This file describes what the code in this public tree does. Production Cloudflar
 - Store favorites, settings, add-store modal and loyalty cards
 - Add/autocomplete/rename/quantity/delete-with-undo planning controls
 - Always-visible drag handles with touch deadzone and haptic/visual position feedback
-- Manual ordering persists through `sortMode` + `manualPosition`
+- Manual ordering persists locally through `sortMode` + `manualPosition`
 - Starting a trip records a synthetic trip from the manual order so route learning can absorb it, then clears the manual override
-- Learned positions use completed store-specific trip history with recency weighting
+- Learned-order indicators include items whose learned position is at the end of the route
 - Completing a trip clears that store's active list locally and persists the completed route in durable history
 - Loyalty cards close with an explicit X button
 
+### Route learning
+
+- Learned positions use store-specific pairwise ordering evidence from completed and synthetic trips with recency weighting
+- One-item errands provide no positional evidence, so they cannot incorrectly teach that their only item belongs at the start of the store
+- Learned-last and unseen items are distinct states; unseen items remain below items with actual route evidence
+- Planning order is derived from current trip history, so route observations synced from another device immediately affect an existing local list
+- Trip history is capped at 200 entries **per store**, rather than 200 globally across all stores
+
 ### Local-first storage and sync
 
-- Active list, selected store, shopping mode and in-progress sequence remain device-local
-- Stores, item catalog/learning data and completed trips form the durable household sync target
+- Active list, selected store, shopping mode, in-progress sequence and manual `sortMode` remain device-local
+- The durable household sync target is exactly stores, items and completed trips, matching the API's stored-state contract
 - localStorage schema version 5 contains migrations and sync metadata
 - Sync retries transient failures with exponential backoff
 - Failed flush/conflict paths are caught so the engine cannot remain stuck in `syncing`
 - Successful pushes do not overwrite local edits made while the request was in flight
+- Concurrent trip-only updates auto-merge when the store/item catalog is unchanged, preserving both devices' completed route observations; catalog conflicts remain explicit
+- Failed optimistic writes are re-read before conflict handling instead of returning a potentially stale pre-race snapshot
 - 401/403 responses propagate as an unauthorized state
 - Repeated conflict-resolution failure surfaces the conflict modal
 - Sync status can show offline, pending, syncing, unauthorized and error states
@@ -76,7 +86,8 @@ No production database ID, Pages project ID, real mail-domain value or deploymen
 - Store-modal keyboard-only flow on mobile Safari
 - Reconnect after a cold offline start
 - Two-device check that in-progress lists remain local while completed/durable data syncs
-- Real repeated-conflict path and conflict-modal recovery UX
+- Two-device check that near-simultaneous completed trips are both retained in shared route history
+- Real repeated catalog-conflict path and conflict-modal recovery UX
 
 ## Key source files
 
@@ -87,11 +98,15 @@ No production database ID, Pages project ID, real mail-domain value or deploymen
 - [src/sync/engine.ts](../src/sync/engine.ts)
 - [src/domain/app-state.ts](../src/domain/app-state.ts)
 - [src/domain/store.ts](../src/domain/store.ts)
+- [src/domain/learning.ts](../src/domain/learning.ts)
+- [src/domain/trips.ts](../src/domain/trips.ts)
 - [src/components/PlanningScreen.tsx](../src/components/PlanningScreen.tsx)
 - [src/components/LoginScreen.tsx](../src/components/LoginScreen.tsx)
 - [src/components/SyncIndicator.tsx](../src/components/SyncIndicator.tsx)
 - [api/src/routes/auth.ts](../api/src/routes/auth.ts)
+- [api/src/routes/state.ts](../api/src/routes/state.ts)
 - [api/src/lib/repository.ts](../api/src/lib/repository.ts)
+- [api/src/lib/state.ts](../api/src/lib/state.ts)
 - [api/src/lib/bootstrap.ts](../api/src/lib/bootstrap.ts)
 - [vite.config.ts](../vite.config.ts)
 - [public/sw.js](../public/sw.js)

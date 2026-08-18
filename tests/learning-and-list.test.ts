@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { persistWeightedPositions } from '../src/domain/app-state'
-import { getLearnedPosition, recalculateWeightedPositions } from '../src/domain/learning'
+import {
+  getLearnedPosition,
+  recalculateWeightedPositions,
+  UNLEARNED_POSITION,
+} from '../src/domain/learning'
 import type { AppState, ListItem, Trip } from '../src/domain/models'
 import { compareListItems, getPlanningRows } from '../src/utils/list'
 
@@ -11,7 +14,7 @@ function makeList(): ListItem[] {
       storeId: 'store-1',
       quantity: 1,
       addedAt: 1,
-      weightedPosition: 1,
+      weightedPosition: UNLEARNED_POSITION,
       manualPosition: -1,
     },
     {
@@ -19,7 +22,7 @@ function makeList(): ListItem[] {
       storeId: 'store-1',
       quantity: 1,
       addedAt: 2,
-      weightedPosition: 1,
+      weightedPosition: UNLEARNED_POSITION,
       manualPosition: -1,
     },
   ]
@@ -62,102 +65,98 @@ function makeState(trips: Trip[]): AppState {
 }
 
 describe('getLearnedPosition', () => {
-  it('returns default position 1 when there are no trips', () => {
-    expect(getLearnedPosition('item-a', [], 100)).toBe(1)
+  it('returns the explicit unlearned position without comparative evidence', () => {
+    expect(getLearnedPosition('item-a', [], 100)).toBe(UNLEARNED_POSITION)
+    expect(
+      getLearnedPosition(
+        'item-a',
+        [{ id: 'single', storeId: 'store-1', completedAt: 100, sequence: ['item-a'] }],
+        100,
+      ),
+    ).toBe(UNLEARNED_POSITION)
   })
 
-  it('returns default position 1 when the item never appears in any trip', () => {
-    const trips: Trip[] = [
-      { id: 'trip-1', storeId: 'store-1', completedAt: 100, sequence: ['item-b'] },
-    ]
-    expect(getLearnedPosition('item-a', trips, 100)).toBe(1)
-  })
-
-  it('returns 0 for the only item in a single-item trip', () => {
-    const trips: Trip[] = [
-      { id: 'trip-1', storeId: 'store-1', completedAt: 100, sequence: ['item-a'] },
-    ]
-    expect(getLearnedPosition('item-a', trips, 100)).toBe(0)
-  })
-
-  it('returns 0 for the first item and 1 for the last item in a two-item trip', () => {
+  it('learns pairwise order from a two-item trip', () => {
     const trips: Trip[] = [
       { id: 'trip-1', storeId: 'store-1', completedAt: 100, sequence: ['item-a', 'item-b'] },
     ]
+
     expect(getLearnedPosition('item-a', trips, 100)).toBe(0)
     expect(getLearnedPosition('item-b', trips, 100)).toBe(1)
   })
 
-  it('returns 0.5 for an item that appears first in one trip and last in another (equal weight)', () => {
+  it('maps a three-item route to early, middle and late comparative positions', () => {
     const trips: Trip[] = [
-      { id: 'trip-1', storeId: 'store-1', completedAt: 100, sequence: ['item-a', 'item-b'] },
-      { id: 'trip-2', storeId: 'store-1', completedAt: 100, sequence: ['item-b', 'item-a'] },
+      {
+        id: 'trip-1',
+        storeId: 'store-1',
+        completedAt: 100,
+        sequence: ['item-a', 'item-b', 'item-c'],
+      },
     ]
-    expect(getLearnedPosition('item-a', trips, 100, 0.05)).toBe(0.5)
+
+    expect(getLearnedPosition('item-a', trips, 100)).toBe(0)
+    expect(getLearnedPosition('item-b', trips, 100)).toBe(0.5)
+    expect(getLearnedPosition('item-c', trips, 100)).toBe(1)
   })
 
-  it('weights recent trips more heavily than older ones', () => {
+  it('does not let a newer single-item errand move an established route position', () => {
     const now = 10 * 24 * 60 * 60 * 1000
-    const oneDayMs = 24 * 60 * 60 * 1000
     const trips: Trip[] = [
-      { id: 'old', storeId: 'store-1', completedAt: now - 9 * oneDayMs, sequence: ['item-b', 'item-a'] },
-      { id: 'new', storeId: 'store-1', completedAt: now - oneDayMs, sequence: ['item-a', 'item-b'] },
+      {
+        id: 'route',
+        storeId: 'store-1',
+        completedAt: now - 1000,
+        sequence: ['item-a', 'item-b', 'item-c'],
+      },
+      {
+        id: 'errand',
+        storeId: 'store-1',
+        completedAt: now,
+        sequence: ['item-c'],
+      },
     ]
-    const posA = getLearnedPosition('item-a', trips, now, 0.2)
-    const posB = getLearnedPosition('item-b', trips, now, 0.2)
-    expect(posA).toBeLessThan(posB)
+
+    expect(getLearnedPosition('item-c', trips, now)).toBe(1)
+  })
+
+  it('weights recent contradictory route evidence more heavily', () => {
+    const now = 10 * 24 * 60 * 60 * 1000
+    const day = 24 * 60 * 60 * 1000
+    const trips: Trip[] = [
+      {
+        id: 'old',
+        storeId: 'store-1',
+        completedAt: now - 9 * day,
+        sequence: ['item-b', 'item-a'],
+      },
+      {
+        id: 'new',
+        storeId: 'store-1',
+        completedAt: now - day,
+        sequence: ['item-a', 'item-b'],
+      },
+    ]
+
+    expect(getLearnedPosition('item-a', trips, now, 0.2)).toBeLessThan(
+      getLearnedPosition('item-b', trips, now, 0.2),
+    )
   })
 })
 
 describe('recalculateWeightedPositions', () => {
-  it('puts unseen items at default bottom position', () => {
-    const list = makeList()
-    const trips: Trip[] = [
+  it('keeps unseen items below a genuinely learned last item', () => {
+    const list = [
+      ...makeList(),
       {
-        id: 'trip-1',
+        itemId: 'item-c',
         storeId: 'store-1',
-        completedAt: 100,
-        sequence: ['item-a'],
+        quantity: 1,
+        addedAt: 3,
+        weightedPosition: UNLEARNED_POSITION,
+        manualPosition: -1,
       },
     ]
-
-    const weighted = recalculateWeightedPositions(list, trips, 100)
-
-    const itemA = weighted.find((item) => item.itemId === 'item-a')
-    const itemB = weighted.find((item) => item.itemId === 'item-b')
-
-    expect(itemA?.weightedPosition).toBe(0)
-    expect(itemB?.weightedPosition).toBe(1)
-  })
-
-  it('applies weighted averaging across trips', () => {
-    const list = makeList()
-    const trips: Trip[] = [
-      {
-        id: 'trip-1',
-        storeId: 'store-1',
-        completedAt: 100,
-        sequence: ['item-a', 'item-b'],
-      },
-      {
-        id: 'trip-2',
-        storeId: 'store-1',
-        completedAt: 100,
-        sequence: ['item-b', 'item-a'],
-      },
-    ]
-
-    const weighted = recalculateWeightedPositions(list, trips, 100, 0.05)
-
-    const itemA = weighted.find((item) => item.itemId === 'item-a')
-    const itemB = weighted.find((item) => item.itemId === 'item-b')
-
-    expect(itemA?.weightedPosition).toBe(0.5)
-    expect(itemB?.weightedPosition).toBe(0.5)
-  })
-
-  it('maps the final item in a trip to normalized position 1', () => {
-    const list = makeList()
     const trips: Trip[] = [
       {
         id: 'trip-1',
@@ -169,180 +168,150 @@ describe('recalculateWeightedPositions', () => {
 
     const weighted = recalculateWeightedPositions(list, trips, 100)
 
-    const itemA = weighted.find((item) => item.itemId === 'item-a')
-    const itemB = weighted.find((item) => item.itemId === 'item-b')
-
-    expect(itemA?.weightedPosition).toBe(0)
-    expect(itemB?.weightedPosition).toBe(1)
-  })
-
-  it('applies recency weighting (newer trips matter more)', () => {
-    const list = makeList()
-    const now = 10 * 24 * 60 * 60 * 1000
-    const oneDayMs = 24 * 60 * 60 * 1000
-
-    const trips: Trip[] = [
-      {
-        id: 'old-trip',
-        storeId: 'store-1',
-        completedAt: now - 9 * oneDayMs,
-        sequence: ['item-b', 'item-a'],
-      },
-      {
-        id: 'new-trip',
-        storeId: 'store-1',
-        completedAt: now - oneDayMs,
-        sequence: ['item-a', 'item-b'],
-      },
-    ]
-
-    const weighted = recalculateWeightedPositions(list, trips, now, 0.2)
-
-    const itemA = weighted.find((item) => item.itemId === 'item-a')
-    const itemB = weighted.find((item) => item.itemId === 'item-b')
-
-    expect((itemA?.weightedPosition ?? 1) < (itemB?.weightedPosition ?? 1)).toBe(true)
+    expect(weighted.find((item) => item.itemId === 'item-b')?.weightedPosition).toBe(1)
+    expect(weighted.find((item) => item.itemId === 'item-c')?.weightedPosition).toBe(
+      UNLEARNED_POSITION,
+    )
   })
 })
 
 describe('compareListItems', () => {
-  it('sorts by weightedPosition then addedAt when no manual positions are set', () => {
+  it('sorts by learned position then addedAt without manual positions', () => {
     expect(
       compareListItems(
-        { weightedPosition: 0.2, addedAt: 5 },
-        { weightedPosition: 0.8, addedAt: 1 },
+        { weightedPosition: 0.2, addedAt: 5, manualPosition: -1 },
+        { weightedPosition: 0.8, addedAt: 1, manualPosition: -1 },
       ),
     ).toBeLessThan(0)
     expect(
       compareListItems(
-        { weightedPosition: 0.5, addedAt: 2 },
-        { weightedPosition: 0.5, addedAt: 1 },
+        { weightedPosition: 0.5, addedAt: 2, manualPosition: -1 },
+        { weightedPosition: 0.5, addedAt: 1, manualPosition: -1 },
       ),
     ).toBeGreaterThan(0)
   })
 
-  it('sorts manually positioned items before items without a manual position', () => {
+  it('prioritizes manual positions over learned positions', () => {
     expect(
       compareListItems(
-        { weightedPosition: 1, addedAt: 9, manualPosition: 3 },
-        { weightedPosition: 0, addedAt: 1 },
-      ),
-    ).toBeLessThan(0)
-  })
-
-  it('orders manually positioned items by their manual position', () => {
-    expect(
-      compareListItems(
-        { weightedPosition: 1, addedAt: 1, manualPosition: 0 },
-        { weightedPosition: 0, addedAt: 2, manualPosition: 1 },
+        { weightedPosition: UNLEARNED_POSITION, addedAt: 9, manualPosition: 0 },
+        { weightedPosition: 0, addedAt: 1, manualPosition: -1 },
       ),
     ).toBeLessThan(0)
   })
 })
 
 describe('getPlanningRows', () => {
-  it('prioritizes manual positions over learned positions', () => {
-    const state: AppState = {
-      ...makeState([]),
-      list: [
+  it('derives ordering from current trip history instead of stale cached weights', () => {
+    const now = Date.now()
+    const state = makeState([
+      {
+        id: 'trip-1',
+        storeId: 'store-1',
+        completedAt: now,
+        sequence: ['item-a', 'item-b'],
+      },
+    ])
+
+    expect(getPlanningRows(state).map((row) => row.id)).toEqual(['item-a', 'item-b'])
+
+    const withRemoteHistory: AppState = {
+      ...state,
+      trips: [
         {
-          itemId: 'item-a',
+          id: 'trip-2',
           storeId: 'store-1',
-          quantity: 1,
-          addedAt: 1,
-          weightedPosition: 0,
-          manualPosition: -1,
-        },
-        {
-          itemId: 'item-b',
-          storeId: 'store-1',
-          quantity: 1,
-          addedAt: 2,
-          weightedPosition: 1,
-          manualPosition: 0,
+          completedAt: now,
+          sequence: ['item-b', 'item-a'],
         },
       ],
     }
 
-    expect(getPlanningRows(state).map((row) => row.id)).toEqual(['item-b', 'item-a'])
+    expect(getPlanningRows(withRemoteHistory).map((row) => row.id)).toEqual(['item-b', 'item-a'])
   })
 
-  it('derives order from current trip history (no stale persisted ordering)', () => {
-    const completedAt = Date.now() - 60 * 60 * 1000
-
-    const withTrips = persistWeightedPositions(
-      makeState([
+  it('marks a learned last item as learned and sorts it before an unseen item', () => {
+    const now = Date.now()
+    const state: AppState = {
+      ...makeState([
         {
           id: 'trip-1',
           storeId: 'store-1',
-          completedAt,
+          completedAt: now,
           sequence: ['item-a', 'item-b'],
         },
       ]),
-      completedAt,
-    )
+      items: [
+        ...makeState([]).items,
+        {
+          id: 'item-c',
+          name: 'C',
+          defaultQuantity: 1,
+          createdAt: 0,
+          lastUsedAt: 0,
+        },
+      ],
+      list: [
+        ...makeList(),
+        {
+          itemId: 'item-c',
+          storeId: 'store-1',
+          quantity: 1,
+          addedAt: 3,
+          weightedPosition: 0,
+          manualPosition: -1,
+        },
+      ],
+    }
 
-    const initialRows = getPlanningRows(withTrips)
-    expect(initialRows.map((row) => row.id)).toEqual(['item-a', 'item-b'])
+    const rows = getPlanningRows(state)
 
-    const afterTripMutation = persistWeightedPositions(
-      {
-        ...withTrips,
-        trips: [
-          {
-            id: 'trip-1',
-            storeId: 'store-1',
-            completedAt,
-            sequence: ['item-b'],
-          },
-        ],
-      },
-      completedAt,
-    )
-
-    const recalculatedRows = getPlanningRows(afterTripMutation)
-    expect(recalculatedRows.map((row) => row.id)).toEqual(['item-b', 'item-a'])
+    expect(rows.map((row) => row.id)).toEqual(['item-a', 'item-b', 'item-c'])
+    expect(rows.find((row) => row.id === 'item-b')?.hasLearnedPosition).toBe(true)
+    expect(rows.find((row) => row.id === 'item-c')?.hasLearnedPosition).toBe(false)
   })
 
   it('keeps learned order stable when an item is renamed', () => {
-    const completedAt = Date.now() - 60 * 60 * 1000
-
-    const withTrips = persistWeightedPositions(
-      makeState([
-        {
-          id: 'trip-1',
-          storeId: 'store-1',
-          completedAt,
-          sequence: ['item-a', 'item-b'],
-        },
-      ]),
-      completedAt,
-    )
-
-    const renamedState: AppState = {
-      ...withTrips,
-      items: withTrips.items.map((item) =>
+    const now = Date.now()
+    const state = makeState([
+      {
+        id: 'trip-1',
+        storeId: 'store-1',
+        completedAt: now,
+        sequence: ['item-a', 'item-b'],
+      },
+    ])
+    const renamed: AppState = {
+      ...state,
+      items: state.items.map((item) =>
         item.id === 'item-a' ? { ...item, name: 'Havremelk' } : item,
       ),
     }
 
-    const rows = getPlanningRows(renamedState)
-
+    const rows = getPlanningRows(renamed)
     expect(rows.map((row) => row.id)).toEqual(['item-a', 'item-b'])
     expect(rows[0]?.name).toBe('Havremelk')
   })
 
-  it('only shows list items for the selected store', () => {
-    const mixedState: AppState = {
-      ...makeState([]),
-      stores: [
+  it('isolates learning and list rows by selected store', () => {
+    const now = Date.now()
+    const state: AppState = {
+      ...makeState([
         {
-          id: 'store-1',
-          name: 'Store 1',
-          subtitle: '0 ture',
-          icon: '1',
-          createdAt: 0,
+          id: 'store-1-trip',
+          storeId: 'store-1',
+          completedAt: now,
+          sequence: ['item-a', 'item-b'],
         },
+        {
+          id: 'store-2-trip',
+          storeId: 'store-2',
+          completedAt: now,
+          sequence: ['item-b', 'item-a'],
+        },
+      ]),
+      stores: [
+        ...makeState([]).stores,
         {
           id: 'store-2',
           name: 'Store 2',
@@ -357,22 +326,22 @@ describe('getPlanningRows', () => {
         {
           itemId: 'item-a',
           storeId: 'store-2',
-          quantity: 3,
+          quantity: 1,
           addedAt: 3,
-          weightedPosition: 0.2,
+          weightedPosition: UNLEARNED_POSITION,
+          manualPosition: -1,
+        },
+        {
+          itemId: 'item-b',
+          storeId: 'store-2',
+          quantity: 1,
+          addedAt: 4,
+          weightedPosition: UNLEARNED_POSITION,
+          manualPosition: -1,
         },
       ],
     }
 
-    const rows = getPlanningRows(mixedState)
-
-    expect(rows).toEqual([
-      {
-        id: 'item-a',
-        name: 'A',
-        qty: 3,
-        hasLearnedPosition: true,
-      },
-    ])
+    expect(getPlanningRows(state).map((row) => row.id)).toEqual(['item-b', 'item-a'])
   })
 })

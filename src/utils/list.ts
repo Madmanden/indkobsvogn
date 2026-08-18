@@ -1,4 +1,5 @@
 import type { AppState, ListItem } from '../domain/models'
+import { recalculateWeightedPositions, UNLEARNED_POSITION } from '../domain/learning'
 
 export interface PlanningRow {
   id: string
@@ -21,9 +22,13 @@ export function compareListItems(
 
 export function getPlanningRows(state: AppState): PlanningRow[] {
   const itemById = new Map(state.items.map((item) => [item.id, item]))
+  const storeTrips = state.trips.filter((trip) => trip.storeId === state.selectedStoreId)
+  const storeList = recalculateWeightedPositions(
+    state.list.filter((listItem) => listItem.storeId === state.selectedStoreId),
+    storeTrips,
+  )
 
-  return [...state.list]
-    .filter((listItem) => listItem.storeId === state.selectedStoreId)
+  return storeList
     .sort(compareListItems)
     .map((listItem) => {
       const item = itemById.get(listItem.itemId)
@@ -33,7 +38,7 @@ export function getPlanningRows(state: AppState): PlanningRow[] {
         id: item.id,
         name: item.name,
         qty: listItem.quantity,
-        hasLearnedPosition: listItem.weightedPosition < 1,
+        hasLearnedPosition: listItem.weightedPosition < UNLEARNED_POSITION,
         manualPosition: listItem.manualPosition,
       }
     })
