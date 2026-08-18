@@ -13,5 +13,6 @@ export function createInitialState(): AppState {
     trips: [],
     isShopping: false,
     currentSequence: [],
+    sortMode: 'learned',
   }
 }
