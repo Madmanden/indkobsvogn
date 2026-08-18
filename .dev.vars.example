@@ -1,3 +1,7 @@
-FROM_EMAIL=noreply@mail.example.com
+FROM_EMAIL=noreply@example.com
 ALLOWED_EMAILS=allowed1@example.com,allowed2@example.com
 RESEND_API_KEY=
+# Development only. Never enable local sign-in fallback in production.
+ALLOW_LOCAL_SIGNIN=1
+# Browser origin used for redirects and CORS when running your own full local Pages setup.
+FRONTEND_URL=http://localhost:8788
