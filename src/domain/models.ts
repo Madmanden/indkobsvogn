@@ -26,6 +26,7 @@ export interface ListItem {
   quantity: number
   addedAt: number
   weightedPosition: number
+  manualPosition: number
 }
 
 export interface Trip {
@@ -43,6 +44,7 @@ export interface AppState {
   trips: Trip[]
   isShopping: boolean
   currentSequence: string[]
+  sortMode: 'learned' | 'manual'
 }
 
 export type SyncableState = Omit<AppState, 'selectedStoreId' | 'isShopping' | 'currentSequence' | 'list'>
