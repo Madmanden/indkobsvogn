@@ -34,6 +34,7 @@ function sanitizeList(list: ListItem[], items: Item[], stores: GroceryStore[]): 
     .map((entry) => ({
       ...entry,
       quantity: Math.max(1, Math.round(entry.quantity)),
+      manualPosition: entry.manualPosition ?? -1,
     }))
 }
 
@@ -63,6 +64,7 @@ export function mergeImportedState(current: AppState, imported: AppState): AppSt
     trips: sanitizeTrips(trips, items, stores),
     isShopping: false,
     currentSequence: [],
+    sortMode: current.sortMode ?? 'learned',
   }
 }
 
@@ -83,11 +85,13 @@ export function parseStateImport(raw: string): AppState | null {
       list: parsed.list.map((listItem) => ({
         ...listItem,
         storeId: fallbackStoreId,
+        manualPosition: -1,
       })),
       trips: parsed.trips.map((trip) => ({
         ...trip,
         storeId: fallbackStoreId,
       })),
+      sortMode: 'learned' as const,
     }
   } catch {
     return null
