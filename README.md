@@ -20,7 +20,7 @@ Indkøbsvogn is a Danish, local-first grocery planner that learns your route thr
 
 ### Store selection
 
-![Indkøbsvogn store selection screen](docs/screenshots/store-selection.jpeg)
+<img src="docs/screenshots/store-selection.jpeg" alt="Indkøbsvogn store selection screen" width="360">
 
 ## Public-repository boundary
 
