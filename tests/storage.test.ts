@@ -20,6 +20,7 @@ function makeState(): AppState {
     trips: [],
     isShopping: false,
     currentSequence: [],
+    sortMode: 'learned',
   }
 }
 

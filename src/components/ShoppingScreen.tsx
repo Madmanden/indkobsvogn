@@ -68,6 +68,7 @@ export function ShoppingScreen({
       quantity: 1,
       addedAt: now,
       weightedPosition: 2,
+      manualPosition: -1,
     }
 
     commit({
@@ -102,6 +103,7 @@ export function ShoppingScreen({
             quantity: item.defaultQuantity,
             addedAt: now,
             weightedPosition: 2,
+            manualPosition: -1,
           },
         ]
 

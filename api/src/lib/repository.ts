@@ -91,6 +91,14 @@ export interface HouseholdRecord {
   members: HouseholdMember[]
 }
 
+/**
+ * Real Cloudflare D1 returns the affected-row count in `meta.changes`;
+ * local mocks historically return it top-level as `changes`. Accept both.
+ */
+function changesOf(result: { changes?: number; meta?: { changes?: number } }): number {
+  return result.meta?.changes ?? result.changes ?? 0
+}
+
 export class Repository {
   constructor(private readonly db: DatabaseLike) {}
 
@@ -159,7 +167,7 @@ export class Repository {
     }
   }
 
-  async consumeVerificationToken(token: string): Promise<VerificationToken | null> {
+  async peekVerificationToken(token: string): Promise<VerificationToken | null> {
     const row = await this.db
       .prepare(
         'SELECT token, email, expires_at, created_at, consumed_at FROM verification_tokens WHERE token = ? LIMIT 1',
@@ -171,12 +179,46 @@ export class Repository {
       return null
     }
 
-    await this.db
-      .prepare('UPDATE verification_tokens SET consumed_at = ? WHERE token = ?')
-      .bind(Date.now(), token)
+    return mapVerificationToken(row)
+  }
+
+  async consumeVerificationToken(token: string): Promise<VerificationToken | null> {
+    const now = Date.now()
+
+    const result = await this.db
+      .prepare(
+        'UPDATE verification_tokens SET consumed_at = ? WHERE token = ? AND consumed_at IS NULL AND expires_at > ?',
+      )
+      .bind(now, token, now)
       .run()
 
-    return mapVerificationToken(row)
+    if (changesOf(result) === 0) {
+      return null
+    }
+
+    const row = await this.db
+      .prepare(
+        'SELECT token, email, expires_at, created_at, consumed_at FROM verification_tokens WHERE token = ? LIMIT 1',
+      )
+      .bind(token)
+      .first<VerificationTokenRow>()
+
+    return row ? mapVerificationToken(row) : null
+  }
+
+  async deleteVerificationTokensForEmail(email: string): Promise<void> {
+    await this.db.prepare('DELETE FROM verification_tokens WHERE email = ?').bind(email).run()
+  }
+
+  async deleteExpiredVerificationTokens(now = Date.now()): Promise<void> {
+    await this.db
+      .prepare('DELETE FROM verification_tokens WHERE expires_at < ? OR consumed_at IS NOT NULL')
+      .bind(now)
+      .run()
+  }
+
+  async deleteExpiredSessions(now = Date.now()): Promise<void> {
+    await this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now).run()
   }
 
   async getHouseholdByMemberEmail(email: string): Promise<HouseholdRecord | null> {
@@ -298,7 +340,7 @@ export class Repository {
       .bind(createId('member'), household.household.id, email, createdAt, household.household.id, household.household.id, email)
       .run()
 
-    if ((result.changes ?? 0) === 0) {
+    if (changesOf(result) === 0) {
       const current = await this.getHouseholdByMemberEmail(email)
       if (current) return current
 
@@ -324,7 +366,7 @@ export class Repository {
       .bind(JSON.stringify(nextState), now, record.household.id, expectedVersion)
       .run()
 
-    if ((result.changes ?? 0) === 0) {
+    if (changesOf(result) === 0) {
       return { updated: false, household: record }
     }
 

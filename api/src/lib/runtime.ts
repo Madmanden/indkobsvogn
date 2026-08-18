@@ -2,7 +2,7 @@ export interface PreparedStatementLike {
   bind: (...values: unknown[]) => PreparedStatementLike
   first: <T = Record<string, unknown>>() => Promise<T | null>
   all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>
-  run: () => Promise<{ success: boolean; changes?: number }>
+  run: () => Promise<{ success: boolean; changes?: number; meta?: { changes?: number } }>
 }
 
 export interface DatabaseLike {
@@ -17,6 +17,7 @@ export interface Env {
   FROM_EMAIL?: string
   SESSION_COOKIE_NAME?: string
   ALLOWED_EMAILS?: string
+  ALLOW_LOCAL_SIGNIN?: string
 }
 
 export interface AuthenticatedUser {

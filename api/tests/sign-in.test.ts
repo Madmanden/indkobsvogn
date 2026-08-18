@@ -26,7 +26,7 @@ class MemoryStatement implements PreparedStatementLike {
     return { results: this.db.query<T>(this.sql, this.params) }
   }
 
-  async run(): Promise<{ success: boolean; changes?: number }> {
+  async run(): Promise<{ success: boolean; changes?: number; meta?: { changes?: number } }> {
     return this.db.execute(this.sql, this.params)
   }
 }
@@ -69,7 +69,7 @@ class MemoryDatabase implements DatabaseLike {
     return []
   }
 
-  async execute(sql: string, params: unknown[]): Promise<{ success: boolean; changes?: number }> {
+  async execute(sql: string, params: unknown[]): Promise<{ success: boolean; changes?: number; meta?: { changes?: number } }> {
     if (sql.startsWith('DELETE FROM rate_limits')) {
       const [windowStart] = params
       let changes = 0
@@ -82,12 +82,52 @@ class MemoryDatabase implements DatabaseLike {
       return { success: true, changes }
     }
 
+    if (sql.startsWith('DELETE FROM verification_tokens WHERE email = ?')) {
+      const [email] = params
+      let changes = 0
+      for (const [key, row] of this.verificationTokens.entries()) {
+        if (String(row.email) === String(email)) {
+          this.verificationTokens.delete(key)
+          changes += 1
+        }
+      }
+      return { success: true, changes }
+    }
+
+    if (sql.startsWith('DELETE FROM verification_tokens') && sql.includes('expires_at')) {
+      const [now] = params
+      let changes = 0
+      for (const [key, row] of this.verificationTokens.entries()) {
+        if (Number(row.expires_at) < Number(now) || row.consumed_at !== null) {
+          this.verificationTokens.delete(key)
+          changes += 1
+        }
+      }
+      return { success: true, changes }
+    }
+
+    if (sql.startsWith('DELETE FROM sessions')) {
+      const [param] = params
+      if (sql.includes('expires_at')) {
+        let changes = 0
+        for (const [key, row] of this.sessions.entries()) {
+          if (Number(row.expires_at) < Number(param)) {
+            this.sessions.delete(key)
+            changes += 1
+          }
+        }
+        return { success: true, changes }
+      }
+      const changed = this.sessions.delete(String(param)) ? 1 : 0
+      return { success: true, meta: { changes: changed } }
+    }
+
     if (sql.startsWith('INSERT INTO rate_limits')) {
       const [key, attempts, windowStart] = params
       const existing = this.rateLimits.get(String(key))
       if (existing) {
         existing.attempts = Number(existing.attempts) + 1
-        return { success: true, changes: 1 }
+        return { success: true, meta: { changes: 1 } }
       }
 
       this.rateLimits.set(String(key), {
@@ -95,13 +135,13 @@ class MemoryDatabase implements DatabaseLike {
         attempts,
         window_start: windowStart,
       })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('INSERT INTO users')) {
       const [id, email, createdAt] = params
       this.users.set(String(id), { id, email, created_at: createdAt })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('INSERT INTO verification_tokens')) {
@@ -113,17 +153,19 @@ class MemoryDatabase implements DatabaseLike {
         created_at: createdAt,
         consumed_at: null,
       })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('UPDATE verification_tokens SET consumed_at')) {
-      const [consumedAt, token] = params
+      const [consumedAt, token, nowOrExpiry] = params
       const row = this.verificationTokens.get(String(token))
-      if (row) {
-        row.consumed_at = consumedAt
-        return { success: true, changes: 1 }
+      if (!row) return { success: true, meta: { changes: 0 } }
+      if (row.consumed_at !== null) return { success: true, meta: { changes: 0 } }
+      if (sql.includes('expires_at > ?') && Number(row.expires_at) <= Number(nowOrExpiry)) {
+        return { success: true, meta: { changes: 0 } }
       }
-      return { success: true, changes: 0 }
+      row.consumed_at = consumedAt
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('INSERT INTO sessions')) {
@@ -134,19 +176,22 @@ class MemoryDatabase implements DatabaseLike {
         expires_at: expiresAt,
         created_at: createdAt,
       })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
-    return { success: true, changes: 0 }
+    return { success: true, meta: { changes: 0 } }
   }
 }
 
-function makeEnv(db: MemoryDatabase, allowedEmails?: string, resendApiKey?: string): Env {
+function makeEnv(db: MemoryDatabase, allowedEmails?: string, resendApiKey?: string, env: Record<string, string | undefined> = {}): Env {
   return {
     DB: db,
     ALLOWED_EMAILS: allowedEmails,
     RESEND_API_KEY: resendApiKey,
     FROM_EMAIL: 'noreply@example.com',
+    FRONTEND_URL: 'http://localhost:5173',
+    ALLOW_LOCAL_SIGNIN: '1',
+    ...env,
   }
 }
 
@@ -155,7 +200,7 @@ afterEach(() => {
 })
 
 describe('sign-in', () => {
-  it('returns a structured error when mail delivery fails', async () => {
+  it('returns a fallback code when mail delivery fails', async () => {
     const db = new MemoryDatabase()
     const fetchMock = vi.spyOn(globalThis, 'fetch')
     fetchMock.mockResolvedValue(new Response('Bad Gateway', { status: 502, statusText: 'Bad Gateway' }))
@@ -169,14 +214,72 @@ describe('sign-in', () => {
       makeEnv(db, 'allowed@example.com', 'test-resend-key'),
     )
 
-    expect(response.status).toBe(502)
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'mail_delivery_failed',
-      message: 'Kunne ikke sende login-linket lige nu. Prøv igen om lidt.',
+    expect(response.status).toBe(200)
+    const payload = await response.json()
+    expect(payload).toMatchObject({
+      ok: true,
+      deliveryStatus: 'fallback',
     })
+    expect(payload.backupCode).toMatch(/^\d{6}$/)
+    expect(payload.verificationUrl).toBeUndefined()
     expect(db.users.size).toBe(1)
     expect(db.verificationTokens.size).toBe(2)
     expect(db.rateLimits.size).toBe(1)
+
+    const verifyResponse = await authRouter.request(
+      '/sign-in/verify-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com', code: payload.backupCode }),
+      },
+      makeEnv(db, 'allowed@example.com', 'test-resend-key'),
+    )
+
+    expect(verifyResponse.status).toBe(200)
+    await expect(verifyResponse.json()).resolves.toMatchObject({ ok: true })
+    expect(db.sessions.size).toBe(1)
+  })
+
+  it('fails closed when email delivery is not configured and local sign-in is disabled', async () => {
+    const db = new MemoryDatabase()
+
+    const response = await authRouter.request(
+      '/sign-in',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com' }),
+      },
+      makeEnv(db, 'allowed@example.com', undefined, { ALLOW_LOCAL_SIGNIN: undefined }),
+    )
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ error: 'sign_in_failed' })
+    expect(db.verificationTokens.size).toBe(0)
+  })
+
+  it('invalidates previously issued tokens on a new sign-in request', async () => {
+    const db = new MemoryDatabase()
+
+    await authRouter.request(
+      '/sign-in',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com' }),
+      },
+      makeEnv(db, 'allowed@example.com'),
+    )
+    expect(db.verificationTokens.size).toBe(2)
+
+    await authRouter.request(
+      '/sign-in',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email: 'allowed@example.com' }),
+      },
+      makeEnv(db, 'allowed@example.com'),
+    )
+
+    expect(db.verificationTokens.size).toBe(2)
   })
 })
 

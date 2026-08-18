@@ -3,7 +3,7 @@ import './App.css'
 import { useAppState } from './hooks/useAppState'
 import { mergeImportedState } from './utils/importExport'
 import { createInitialState } from './domain/default-state'
-import { cancelTrip, completeTrip } from './domain/app-state'
+import { cancelTrip, completeTrip, startTrip } from './domain/app-state'
 import { appStore } from './domain/store'
 import { StoresScreen } from './components/StoresScreen'
 import { PlanningScreen } from './components/PlanningScreen'
@@ -17,6 +17,7 @@ import { createId } from './utils/id'
 import type { GroceryStore } from './domain/models'
 import { LoginScreen } from './components/LoginScreen'
 import { HouseholdSetupScreen } from './components/HouseholdSetupScreen'
+import { ConflictModal } from './components/ConflictModal'
 import { mergeServerStateIntoLocal, toSyncableState } from './api/client'
 import { useAuth } from './auth/useAuth'
 import {
@@ -24,6 +25,9 @@ import {
   initializeSync,
   registerSyncHandlers,
   resetSyncEngine,
+  resolveConflictKeepMine,
+  resolveConflictUseServer,
+  type SyncConflict,
   type SyncStatus,
 } from './sync/engine'
 
@@ -36,18 +40,23 @@ function App() {
     user,
     household,
     authError,
+    isOffline,
     signIn,
     verifySignInCode,
     signOut,
+    clearAuthError,
     createHousehold: createHouseholdForUser,
     joinHousehold: joinHouseholdForUser,
+    refresh,
   } = useAuth()
   const [screen, setScreen] = useState<Screen>('stores')
   const [loyaltyReturnTo, setLoyaltyReturnTo] = useState<'shopping' | 'stores'>('shopping')
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(getSyncStatus())
+  const [syncConflict, setSyncConflict] = useState<SyncConflict | null>(null)
   const [isAddStoreOpen, setIsAddStoreOpen] = useState(false)
   const appStateRef = useRef(appState)
   const replaceRef = useRef(replace)
+  const refreshRef = useRef(refresh)
   const householdId = household?.household.id ?? null
 
   useEffect(() => {
@@ -57,6 +66,10 @@ function App() {
   useEffect(() => {
     replaceRef.current = replace
   }, [replace])
+
+  useEffect(() => {
+    refreshRef.current = refresh
+  }, [refresh])
 
   const selectedStore = appState.stores.find((s) => s.id === appState.selectedStoreId) ?? appState.stores[0]
 
@@ -69,6 +82,10 @@ function App() {
     registerSyncHandlers({
       applyRemoteState: (next, serverVersion) => {
         replaceRef.current(next, { serverVersion })
+      },
+      onConflict: setSyncConflict,
+      onUnauthorized: () => {
+        void refreshRef.current()
       },
       onStatusChange: setSyncStatus,
     })
@@ -142,11 +159,7 @@ function App() {
   }
 
   function startShopping(): void {
-    commit({
-      ...appState,
-      isShopping: true,
-      currentSequence: [],
-    })
+    commit(startTrip(appState))
     setScreen('shopping')
   }
 
@@ -202,7 +215,8 @@ function App() {
     return joined
   }
 
-  async function handleSignIn(email: string): Promise<{ verificationUrl?: string }> {
+  async function handleSignIn(email: string) {
+    clearAuthError()
     return signIn(email)
   }
 
@@ -237,7 +251,7 @@ function App() {
     )
   }
 
-  if (status === 'authenticated' && !household) {
+  if (status === 'authenticated' && !household && !isOffline) {
     return (
       <main className="app">
         <div className="shell">
@@ -276,6 +290,12 @@ function App() {
   return (
     <main className="app">
       <div className="shell">
+        {isOffline ? (
+          <p className="offline-banner" role="status">
+            Ingen forbindelse – ændringer gemmes på enheden og synkroniseres, når du er online igen.
+          </p>
+        ) : null}
+
         {screen === 'stores' && (
           <ErrorBoundary>
             <StoresScreen
@@ -341,6 +361,20 @@ function App() {
 
         {isAddStoreOpen ? (
           <AddStoreModal onCreate={addStore} onCancel={() => setIsAddStoreOpen(false)} />
+        ) : null}
+
+        {syncConflict ? (
+          <ConflictModal
+            conflict={syncConflict}
+            onKeepMine={async () => {
+              const next = await resolveConflictKeepMine(syncConflict)
+              setSyncConflict(next)
+            }}
+            onUseServer={() => {
+              resolveConflictUseServer(syncConflict)
+              setSyncConflict(null)
+            }}
+          />
         ) : null}
       </div>
     </main>

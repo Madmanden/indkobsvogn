@@ -164,6 +164,7 @@ describe('import/export', () => {
           quantity: 4,
           addedAt: 9,
           weightedPosition: 3,
+          manualPosition: -1,
         },
       ],
     }
@@ -177,6 +178,7 @@ describe('import/export', () => {
         quantity: 4,
         addedAt: 9,
         weightedPosition: 3,
+        manualPosition: -1,
       },
     ])
   })

@@ -1,6 +1,6 @@
 /* global self, caches, fetch, Response, URL */
 
-const CACHE_NAME = 'indkobsvogn-cache-v4'
+const CACHE_NAME = 'indkobsvogn-cache-v__CACHE_VERSION__'
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.svg', '/icons/icon-512.svg']
 
 function isNetworkFirstRequest(request, url) {

@@ -8,6 +8,7 @@ export interface AuthContextValue {
   user: HouseholdMeResponse['user'] | null
   household: HouseholdRecord | null
   authError: string | null
+  isOffline: boolean
   signIn: (email: string) => Promise<SignInResponse>
   verifySignInCode: (email: string, code: string) => Promise<void>
   signOut: () => Promise<void>

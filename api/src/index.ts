@@ -9,13 +9,39 @@ import { ensureDatabaseReady } from './lib/bootstrap'
 
 const app = new Hono<{ Bindings: Env }>().basePath('/api')
 
+const RECOMMENDED_ENV_VARS: ReadonlyArray<keyof Env> = [
+  'RESEND_API_KEY',
+  'FROM_EMAIL',
+  'ALLOWED_EMAILS',
+  'FRONTEND_URL',
+]
+
+let envWarningIssued = false
+
 app.use(
   '*',
   async (c, next) => {
     await ensureDatabaseReady(c.env.DB)
+
+    if (!envWarningIssued) {
+      envWarningIssued = true
+      const missing = RECOMMENDED_ENV_VARS.filter((name) => {
+        const value = c.env[name]
+        return value === undefined || value === null || String(value).trim() === ''
+      })
+
+      if (missing.length > 0 && !isLocalSignInAllowed(c.env)) {
+        console.warn(`Missing recommended env vars: ${missing.join(', ')}`)
+      }
+    }
+
     await next()
   },
 )
+
+function isLocalSignInAllowed(env: Env): boolean {
+  return env.ALLOW_LOCAL_SIGNIN === '1' || env.ALLOW_LOCAL_SIGNIN === 'true'
+}
 
 app.use(
   '*',
@@ -23,7 +49,16 @@ app.use(
     origin: (origin, c) => {
       const frontendUrl = c.env.FRONTEND_URL?.trim()
       if (frontendUrl) return frontendUrl
-      return origin ?? '*'
+
+      // No FRONTEND_URL configured: only allow same-origin requests
+      if (!origin) return undefined
+
+      try {
+        const requestOrigin = new URL(c.req.url).origin
+        return origin === requestOrigin ? origin : undefined
+      } catch {
+        return undefined
+      }
     },
     credentials: true,
   }),

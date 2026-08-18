@@ -60,7 +60,8 @@ export function isListItem(value: unknown): value is ListItem {
     typeof value.storeId === 'string' &&
     isFiniteNumber(value.quantity) &&
     isFiniteNumber(value.addedAt) &&
-    isFiniteNumber(value.weightedPosition)
+    isFiniteNumber(value.weightedPosition) &&
+    (typeof value.manualPosition === 'undefined' || isFiniteNumber(value.manualPosition))
   )
 }
 
@@ -89,7 +90,8 @@ export function isAppState(value: unknown): value is AppState {
     Array.isArray(value.trips) &&
     value.trips.every(isTrip) &&
     typeof value.isShopping === 'boolean' &&
-    isStringArray(value.currentSequence)
+    isStringArray(value.currentSequence) &&
+    (typeof value.sortMode === 'undefined' || value.sortMode === 'learned' || value.sortMode === 'manual')
   )
 }
 
