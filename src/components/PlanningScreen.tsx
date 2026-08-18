@@ -4,9 +4,11 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react'
 import type { AppState, GroceryStore, Item, ListItem } from '../domain/models'
-import { getPlanningRows } from '../utils/list'
+import { reorderList } from '../domain/app-state'
+import { getPlanningRows, type PlanningRow } from '../utils/list'
 import { normalizeItemName, similarity } from '../utils/fuzzy'
 import { createId } from '../utils/id'
 import { getLearnedPosition } from '../domain/learning'
@@ -33,18 +35,51 @@ export function PlanningScreen({
 }: Props) {
   const [addInput, setAddInput] = useState('')
   const [undoState, setUndoState] = useState<UndoState | null>(null)
+  const [dragItemId, setDragItemId] = useState<string | null>(null)
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null)
+  const [pulsingItemId, setPulsingItemId] = useState<string | null>(null)
 
   const undoTimeoutRef = useRef<number | null>(null)
+  const pulseTimeoutRef = useRef<number | null>(null)
+  // Pointer events can outpace React renders, so the in-flight drag state
+  // lives in refs; the mirrored useState only drives rendering.
+  const dragItemIdRef = useRef<string | null>(null)
+  const dragOrderRef = useRef<string[] | null>(null)
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     return () => {
       if (undoTimeoutRef.current !== null) {
         window.clearTimeout(undoTimeoutRef.current)
       }
+      if (pulseTimeoutRef.current !== null) {
+        window.clearTimeout(pulseTimeoutRef.current)
+      }
     }
   }, [])
 
   const planningRows = useMemo(() => getPlanningRows(appState), [appState])
+
+  const displayRows = useMemo(() => {
+    if (dragOrder) {
+      if (dragOrder.length !== planningRows.length) return planningRows
+      const rowById = new Map(planningRows.map((row) => [row.id, row]))
+      return dragOrder
+        .map((id) => rowById.get(id))
+        .filter((row): row is PlanningRow => row !== undefined)
+    }
+    return planningRows
+  }, [planningRows, dragOrder])
+
+  const hasManualOrder = appState.sortMode === 'manual'
+
+  function commitManualOrder(nextState: AppState, order: string[]): void {
+    commit(reorderList(nextState, order))
+  }
+
+  function getCurrentManualOrder(): string[] {
+    return planningRows.map((row) => row.id)
+  }
 
   const fuzzyMatch = useMemo(() => {
     const value = addInput.trim()
@@ -109,13 +144,21 @@ export function PlanningScreen({
       quantity: 1,
       addedAt: now,
       weightedPosition: 1,
+      manualPosition: appState.sortMode === 'manual' ? planningRows.length : -1,
     }
 
-    commit({
+    const nextState = {
       ...appState,
       items: [...appState.items, nextItem],
       list: [...appState.list, nextListItem],
-    })
+    }
+
+    if (appState.sortMode === 'manual') {
+      commitManualOrder(nextState, [...getCurrentManualOrder(), nextItem.id])
+      return
+    }
+
+    commit(nextState)
   }
 
   function addItem(): void {
@@ -166,16 +209,23 @@ export function PlanningScreen({
               appState.trips.filter((t) => t.storeId === appState.selectedStoreId),
               now,
             ),
+            manualPosition: -1,
           },
         ]
 
-    commit({
+    const nextState = {
       ...appState,
       items: appState.items.map((entry) =>
         entry.id === match.id ? { ...entry, lastUsedAt: now } : entry,
       ),
       list: nextList,
-    })
+    }
+
+    if (appState.sortMode === 'manual' && !existingEntry) {
+      commitManualOrder(nextState, [...getCurrentManualOrder(), match.id])
+    } else {
+      commit(nextState)
+    }
 
     setAddInput('')
   }
@@ -215,20 +265,30 @@ export function PlanningScreen({
   }
 
   function removeFromCurrentList(id: string): void {
-    const index = appState.list.findIndex(
-      (item) => item.itemId === id && item.storeId === appState.selectedStoreId,
-    )
+    const index = planningRows.findIndex((row) => row.id === id)
     if (index < 0) return
 
-    const removed = appState.list[index]
+    const removed = appState.list.find(
+      (item) => item.itemId === id && item.storeId === appState.selectedStoreId,
+    )
+    if (!removed) return
 
-    commit({
+    const nextState = {
       ...appState,
       list: appState.list.filter(
         (item) => !(item.itemId === id && item.storeId === appState.selectedStoreId),
       ),
       currentSequence: appState.currentSequence.filter((itemId) => itemId !== id),
-    })
+    }
+
+    if (appState.sortMode === 'manual') {
+      commitManualOrder(
+        nextState,
+        getCurrentManualOrder().filter((itemId) => itemId !== id),
+      )
+    } else {
+      commit(nextState)
+    }
 
     setUndoState({ listItem: removed, index })
     scheduleUndoClear()
@@ -253,10 +313,20 @@ export function PlanningScreen({
     const insertionIndex = Math.min(undoState.index, nextList.length)
     nextList.splice(insertionIndex, 0, undoState.listItem)
 
-    commit({
+    const nextState = {
       ...appState,
       list: nextList,
-    })
+    }
+
+    if (appState.sortMode === 'manual') {
+      const order = getCurrentManualOrder()
+      const restoredIndex = Math.min(undoState.index, order.length)
+      const nextOrder = [...order]
+      nextOrder.splice(restoredIndex, 0, undoState.listItem.itemId)
+      commitManualOrder(nextState, nextOrder)
+    } else {
+      commit(nextState)
+    }
 
     clearUndoTimer()
     setUndoState(null)
@@ -264,6 +334,100 @@ export function PlanningScreen({
 
   function onAddKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key === 'Enter') addItem()
+  }
+
+  function onDragHandlePointerDown(event: ReactPointerEvent<HTMLButtonElement>, id: string): void {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const order = planningRows.map((row) => row.id)
+    dragItemIdRef.current = id
+    dragOrderRef.current = order
+    dragStartPosRef.current = { x: event.clientX, y: event.clientY }
+    setDragItemId(id)
+    setDragOrder(order)
+  }
+
+  function onDragHandlePointerMove(event: ReactPointerEvent<HTMLButtonElement>): void {
+    const draggedId = dragItemIdRef.current
+    const order = dragOrderRef.current
+    if (!draggedId || !order) return
+
+    const start = dragStartPosRef.current
+    if (start) {
+      const dx = event.clientX - start.x
+      const dy = event.clientY - start.y
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
+      dragStartPosRef.current = null
+    }
+
+    const rowElement = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-item-id]')
+    const overId = rowElement?.dataset.itemId
+    if (!overId || overId === draggedId) return
+
+    const fromIndex = order.indexOf(draggedId)
+    const toIndex = order.indexOf(overId)
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
+
+    const next = [...order]
+    next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, draggedId)
+    dragOrderRef.current = next
+    setDragOrder(next)
+  }
+
+  function onDragHandlePointerEnd(): void {
+    const draggedId = dragItemIdRef.current
+    const order = dragOrderRef.current
+
+    if (draggedId && order) {
+      const currentOrder = planningRows.map((row) => row.id)
+      const changed =
+        order.length !== currentOrder.length ||
+        order.some((id, index) => id !== currentOrder[index])
+      if (changed) {
+        commitManualOrder(appState, order)
+        triggerHaptic(draggedId)
+      }
+    }
+
+    dragItemIdRef.current = null
+    dragOrderRef.current = null
+    dragStartPosRef.current = null
+    setDragItemId(null)
+    setDragOrder(null)
+  }
+
+  function triggerHaptic(id: string): void {
+    if (navigator.vibrate) navigator.vibrate(15)
+    if (pulseTimeoutRef.current !== null) {
+      window.clearTimeout(pulseTimeoutRef.current)
+    }
+    setPulsingItemId(id)
+    pulseTimeoutRef.current = window.setTimeout(() => {
+      pulseTimeoutRef.current = null
+      setPulsingItemId(null)
+    }, 200)
+  }
+
+  function moveItemByOffset(id: string, offset: number): void {
+    const source = getCurrentManualOrder()
+    const fromIndex = source.indexOf(id)
+    const toIndex = fromIndex + offset
+    if (fromIndex < 0 || toIndex < 0 || toIndex >= source.length) return
+
+    const next = [...source]
+    next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, id)
+    commitManualOrder(appState, next)
+    triggerHaptic(id)
+  }
+
+  function onDragHandleKeyDown(event: KeyboardEvent<HTMLButtonElement>, id: string): void {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+
+    event.preventDefault()
+    moveItemByOffset(id, event.key === 'ArrowUp' ? -1 : 1)
   }
 
   return (
@@ -283,6 +447,9 @@ export function PlanningScreen({
         </div>
         <div className="header-meta">
           <span className="meta-count">{planningRows.length} varer</span>
+          {hasManualOrder ? (
+            <span className="meta-manual">Manuel rækkefølge</span>
+          ) : null}
         </div>
       </header>
 
@@ -339,8 +506,33 @@ export function PlanningScreen({
       ) : null}
 
       <section className="list-block items">
-        {planningRows.map((item) => (
-          <article key={item.id} className={`item-row${item.hasLearnedPosition ? ' item-row--learned' : ''}`}>
+        {displayRows.map((item) => (
+          <article
+            key={item.id}
+            data-item-id={item.id}
+            className={`item-row${item.hasLearnedPosition ? ' item-row--learned' : ''}${
+              dragItemId === item.id ? ' item-row--dragging' : ''
+            }${pulsingItemId === item.id ? ' item-row--snap' : ''}`}
+          >
+            <button
+              type="button"
+              className="drag-handle"
+              aria-label={`Flyt ${item.name} op eller ned i listen`}
+              onPointerDown={(event) => onDragHandlePointerDown(event, item.id)}
+              onPointerMove={onDragHandlePointerMove}
+              onPointerUp={onDragHandlePointerEnd}
+              onPointerCancel={onDragHandlePointerEnd}
+              onKeyDown={(event) => onDragHandleKeyDown(event, item.id)}
+            >
+              <svg className="drag-handle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="9" cy="6" r="1.6" />
+                <circle cx="15" cy="6" r="1.6" />
+                <circle cx="9" cy="12" r="1.6" />
+                <circle cx="15" cy="12" r="1.6" />
+                <circle cx="9" cy="18" r="1.6" />
+                <circle cx="15" cy="18" r="1.6" />
+              </svg>
+            </button>
             <div className="item-main inline-item-main">
               <div className="item-name-wrap">
                 <input
