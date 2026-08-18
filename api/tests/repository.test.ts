@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Repository } from '../src/lib/repository'
+import { createToken } from '../src/lib/crypto'
 import type { DatabaseLike, PreparedStatementLike } from '../src/lib/runtime'
 
 type TableRow = Record<string, unknown>
@@ -26,7 +27,7 @@ class MemoryStatement implements PreparedStatementLike {
     return { results: this.db.query<T>(this.sql, this.params) }
   }
 
-  async run(): Promise<{ success: boolean; changes?: number }> {
+  async run(): Promise<{ success: boolean; changes?: number; meta?: { changes?: number } }> {
     return this.db.execute(this.sql, this.params)
   }
 }
@@ -95,26 +96,49 @@ class MemoryDatabase implements DatabaseLike {
     return []
   }
 
-  async execute(sql: string, params: unknown[]): Promise<{ success: boolean; changes?: number }> {
+  async execute(sql: string, params: unknown[]): Promise<{ success: boolean; changes?: number; meta?: { changes?: number } }> {
     if (sql.startsWith('INSERT INTO users')) {
       const [id, email, createdAt] = params
       if ([...this.users.values()].some((entry) => entry.email === email)) {
         throw new Error('unique constraint failed: users.email')
       }
       this.users.set(String(id), { id, email, created_at: createdAt })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('INSERT INTO sessions')) {
       const [token, userId, expiresAt, createdAt] = params
       this.sessions.set(String(token), { token, user_id: userId, expires_at: expiresAt, created_at: createdAt })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
+    }
+
+    if (sql.startsWith('DELETE FROM verification_tokens')) {
+      const [param] = params
+      let changes = 0
+      if (sql.includes('expires_at')) {
+        const now = Number(param)
+        for (const [key, row] of this.verificationTokens.entries()) {
+          if (Number(row.expires_at) < now || row.consumed_at !== null) {
+            this.verificationTokens.delete(key)
+            changes += 1
+          }
+        }
+      } else {
+        const email = String(param)
+        for (const [key, row] of this.verificationTokens.entries()) {
+          if (String(row.email) === email) {
+            this.verificationTokens.delete(key)
+            changes += 1
+          }
+        }
+      }
+      return { success: true, meta: { changes } }
     }
 
     if (sql.startsWith('DELETE FROM sessions')) {
       const [token] = params
       const changed = this.sessions.delete(String(token)) ? 1 : 0
-      return { success: true, changes: changed }
+      return { success: true, meta: { changes: changed } }
     }
 
     if (sql.startsWith('INSERT INTO verification_tokens')) {
@@ -126,15 +150,19 @@ class MemoryDatabase implements DatabaseLike {
         created_at: createdAt,
         consumed_at: null,
       })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('UPDATE verification_tokens SET consumed_at = ?')) {
-      const [consumedAt, token] = params
+      const [consumedAt, token, nowOrExpiry] = params
       const row = this.verificationTokens.get(String(token))
-      if (!row) return { success: true, changes: 0 }
+      if (!row) return { success: true, meta: { changes: 0 } }
+      if (row.consumed_at !== null) return { success: true, meta: { changes: 0 } }
+      if (sql.includes('expires_at > ?') && Number(row.expires_at) <= Number(nowOrExpiry)) {
+        return { success: true, meta: { changes: 0 } }
+      }
       row.consumed_at = consumedAt
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('INSERT INTO households')) {
@@ -150,7 +178,7 @@ class MemoryDatabase implements DatabaseLike {
         created_at: createdAt,
         updated_at: updatedAt,
       })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('INSERT INTO members')) {
@@ -158,10 +186,10 @@ class MemoryDatabase implements DatabaseLike {
         const [id, householdId, email, createdAt, countHouseholdId, existingHouseholdId, existingEmail] = params
         const currentCount = this.members.filter((entry) => entry.household_id === countHouseholdId).length
         if (currentCount >= 2) {
-          return { success: true, changes: 0 }
+          return { success: true, meta: { changes: 0 } }
         }
         if (this.members.some((entry) => entry.household_id === existingHouseholdId && entry.email === existingEmail)) {
-          return { success: true, changes: 0 }
+          return { success: true, meta: { changes: 0 } }
         }
         this.members.push({
           id,
@@ -169,7 +197,7 @@ class MemoryDatabase implements DatabaseLike {
           email,
           created_at: createdAt,
         })
-        return { success: true, changes: 1 }
+        return { success: true, meta: { changes: 1 } }
       }
 
       const [id, householdId, email, createdAt] = params
@@ -182,22 +210,22 @@ class MemoryDatabase implements DatabaseLike {
         email,
         created_at: createdAt,
       })
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
     if (sql.startsWith('UPDATE households SET state_json = ?, version = version + 1')) {
       const [stateJson, updatedAt, id, expectedVersion] = params
       const row = this.households.get(String(id))
       if (!row || row.version !== expectedVersion) {
-        return { success: true, changes: 0 }
+        return { success: true, meta: { changes: 0 } }
       }
       row.state_json = stateJson
       row.version = Number(row.version) + 1
       row.updated_at = updatedAt
-      return { success: true, changes: 1 }
+      return { success: true, meta: { changes: 1 } }
     }
 
-    return { success: true, changes: 0 }
+    return { success: true, meta: { changes: 0 } }
   }
 }
 
@@ -244,7 +272,7 @@ describe('Repository', () => {
     class RaceDatabase extends MemoryDatabase {
       private injected = false
 
-      async execute(sql: string, params: unknown[]): Promise<{ success: boolean; changes?: number }> {
+      async execute(sql: string, params: unknown[]): Promise<{ success: boolean; changes?: number; meta?: { changes?: number } }> {
         if (sql.includes('INSERT INTO members') && sql.includes('SELECT') && !this.injected) {
           this.injected = true
           const householdId = String(params[1])
@@ -291,5 +319,43 @@ describe('Repository', () => {
     const staleUpdate = await repo.updateHouseholdState('alice@example.com', initialState, 1)
     expect(staleUpdate.updated).toBe(false)
     expect(staleUpdate.household.household.version).toBe(2)
+  })
+})
+
+describe('verification tokens', () => {
+  it('lets a valid token be peeked without consuming it, then consumed exactly once', async () => {
+    const { repo, db } = makeRepository()
+    const token = createToken(48)
+    await repo.saveVerificationToken(token, 'alice@example.com', Date.now() + 1000 * 60 * 15)
+
+    const peeked = await repo.peekVerificationToken(token)
+    expect(peeked?.email).toBe('alice@example.com')
+    expect(db.verificationTokens.get(token)?.consumed_at).toBeNull()
+
+    const consumed = await repo.consumeVerificationToken(token)
+    expect(consumed?.email).toBe('alice@example.com')
+
+    const second = await repo.consumeVerificationToken(token)
+    expect(second).toBeNull()
+  })
+
+  it('does not consume an expired token', async () => {
+    const { repo } = makeRepository()
+    const token = createToken(48)
+    await repo.saveVerificationToken(token, 'alice@example.com', Date.now() - 1000)
+
+    await expect(repo.consumeVerificationToken(token)).resolves.toBeNull()
+    expect(await repo.peekVerificationToken(token)).toBeNull()
+  })
+
+  it('deletes every outstanding token for an email on a new sign-in', async () => {
+    const { repo } = makeRepository()
+    await repo.saveVerificationToken(createToken(48), 'alice@example.com', Date.now() + 9999)
+    await repo.saveVerificationToken(createToken(48), 'alice@example.com', Date.now() + 9999)
+    await repo.saveVerificationToken(`code:alice@example.com:123456`, 'alice@example.com', Date.now() + 9999)
+
+    await repo.deleteVerificationTokensForEmail('alice@example.com')
+
+    expect(await repo.peekVerificationToken('code:alice@example.com:123456')).toBeNull()
   })
 })
