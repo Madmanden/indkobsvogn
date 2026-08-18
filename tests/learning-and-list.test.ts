@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { persistWeightedPositions } from '../src/domain/app-state'
 import { getLearnedPosition, recalculateWeightedPositions } from '../src/domain/learning'
 import type { AppState, ListItem, Trip } from '../src/domain/models'
-import { getPlanningRows } from '../src/utils/list'
+import { compareListItems, getPlanningRows } from '../src/utils/list'
 
 function makeList(): ListItem[] {
   return [
@@ -12,6 +12,7 @@ function makeList(): ListItem[] {
       quantity: 1,
       addedAt: 1,
       weightedPosition: 1,
+      manualPosition: -1,
     },
     {
       itemId: 'item-b',
@@ -19,6 +20,7 @@ function makeList(): ListItem[] {
       quantity: 1,
       addedAt: 2,
       weightedPosition: 1,
+      manualPosition: -1,
     },
   ]
 }
@@ -55,6 +57,7 @@ function makeState(trips: Trip[]): AppState {
     trips,
     isShopping: false,
     currentSequence: [],
+    sortMode: 'learned',
   }
 }
 
@@ -202,7 +205,68 @@ describe('recalculateWeightedPositions', () => {
   })
 })
 
+describe('compareListItems', () => {
+  it('sorts by weightedPosition then addedAt when no manual positions are set', () => {
+    expect(
+      compareListItems(
+        { weightedPosition: 0.2, addedAt: 5 },
+        { weightedPosition: 0.8, addedAt: 1 },
+      ),
+    ).toBeLessThan(0)
+    expect(
+      compareListItems(
+        { weightedPosition: 0.5, addedAt: 2 },
+        { weightedPosition: 0.5, addedAt: 1 },
+      ),
+    ).toBeGreaterThan(0)
+  })
+
+  it('sorts manually positioned items before items without a manual position', () => {
+    expect(
+      compareListItems(
+        { weightedPosition: 1, addedAt: 9, manualPosition: 3 },
+        { weightedPosition: 0, addedAt: 1 },
+      ),
+    ).toBeLessThan(0)
+  })
+
+  it('orders manually positioned items by their manual position', () => {
+    expect(
+      compareListItems(
+        { weightedPosition: 1, addedAt: 1, manualPosition: 0 },
+        { weightedPosition: 0, addedAt: 2, manualPosition: 1 },
+      ),
+    ).toBeLessThan(0)
+  })
+})
+
 describe('getPlanningRows', () => {
+  it('prioritizes manual positions over learned positions', () => {
+    const state: AppState = {
+      ...makeState([]),
+      list: [
+        {
+          itemId: 'item-a',
+          storeId: 'store-1',
+          quantity: 1,
+          addedAt: 1,
+          weightedPosition: 0,
+          manualPosition: -1,
+        },
+        {
+          itemId: 'item-b',
+          storeId: 'store-1',
+          quantity: 1,
+          addedAt: 2,
+          weightedPosition: 1,
+          manualPosition: 0,
+        },
+      ],
+    }
+
+    expect(getPlanningRows(state).map((row) => row.id)).toEqual(['item-b', 'item-a'])
+  })
+
   it('derives order from current trip history (no stale persisted ordering)', () => {
     const completedAt = Date.now() - 60 * 60 * 1000
 
