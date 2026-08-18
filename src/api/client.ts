@@ -169,12 +169,11 @@ async function requestRaw(path: string, init?: RequestInit): Promise<Response> {
 }
 
 export function toSyncableState(state: AppState): SyncableState {
-  const { selectedStoreId, isShopping, currentSequence, list, ...syncable } = state
-  void selectedStoreId
-  void isShopping
-  void currentSequence
-  void list
-  return syncable
+  return {
+    stores: state.stores,
+    items: state.items,
+    trips: state.trips,
+  }
 }
 
 export function mergeServerStateIntoLocal(localState: AppState, serverState: SyncableState): AppState {
@@ -185,6 +184,7 @@ export function mergeServerStateIntoLocal(localState: AppState, serverState: Syn
     selectedStoreId: resolveSelectedStoreId(serverState.stores, localState.selectedStoreId),
     isShopping: localState.isShopping,
     currentSequence: localState.currentSequence,
+    sortMode: localState.sortMode,
   }
 }
 
