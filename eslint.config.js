@@ -20,4 +20,30 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Type-aware linting for the app source. The headline rule catches the class
+    // of bugs that cause silent sync failures via unhandled promise rejections.
+    files: ['src/**/*.{ts,tsx}'],
+    extends: [tseslint.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parser: tseslint.parser,
+      parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
+        project: './tsconfig.app.json',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      // React event handlers legitimately await promises (onClick={handleSubmit}).
+      '@typescript-eslint/no-misused-promises': 'off',
+      // import.meta.env and parsed JSON are intentionally untyped here.
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
 ])
