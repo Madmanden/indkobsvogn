@@ -1,7 +1,7 @@
 import type { ListItem, Trip } from './models'
 import { createId } from '../utils/id'
 
-const DEFAULT_WEIGHTED_POSITION = 1
+export const UNLEARNED_POSITION = 2
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 
 function calculateTripWeight(completedAt: number, now: number, lambda: number): number {
@@ -9,33 +9,44 @@ function calculateTripWeight(completedAt: number, now: number, lambda: number): 
   return Math.exp(-lambda * daysAgo)
 }
 
-function calculateNormalizedIndex(index: number, tripLength: number): number {
-  if (tripLength <= 0) return 0
-  if (tripLength === 1) return 0
-  return index / (tripLength - 1)
-}
-
+/**
+ * Learn a route position from pairwise ordering evidence.
+ *
+ * Each trip contributes one comparison between the item and every other item
+ * on that trip. Items observed before this item contribute toward the item
+ * being later in the route; items observed after it contribute toward the
+ * item being earlier. A one-item trip therefore contributes no positional
+ * evidence at all.
+ *
+ * Learned positions stay in [0, 1]. UNLEARNED_POSITION is deliberately
+ * outside that range so a genuinely learned "last item" does not collide
+ * with an item we have never learned.
+ */
 export function getLearnedPosition(
   itemId: string,
   trips: Trip[],
   now = Date.now(),
   lambda = 0.05,
 ): number {
-  let weightedTotal = 0
-  let weightSum = 0
+  let weightedBefore = 0
+  let weightedComparisons = 0
 
   for (const trip of trips) {
+    if (trip.sequence.length < 2) continue
+
     const index = trip.sequence.indexOf(itemId)
     if (index < 0) continue
 
-    const normalizedIndex = calculateNormalizedIndex(index, trip.sequence.length)
+    const comparisonCount = trip.sequence.length - 1
     const weight = calculateTripWeight(trip.completedAt, now, lambda)
 
-    weightedTotal += normalizedIndex * weight
-    weightSum += weight
+    weightedBefore += index * weight
+    weightedComparisons += comparisonCount * weight
   }
 
-  return weightSum > 0 ? weightedTotal / weightSum : DEFAULT_WEIGHTED_POSITION
+  return weightedComparisons > 0
+    ? weightedBefore / weightedComparisons
+    : UNLEARNED_POSITION
 }
 
 export function createSyntheticTrip(
