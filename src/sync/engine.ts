@@ -14,6 +14,7 @@ import {
   mergeServerStateIntoLocal,
   pushState,
   toSyncableState,
+  type PushStateResult,
 } from '../api/client'
 
 // === Types ===
@@ -35,6 +36,7 @@ export interface SyncStatus {
 interface SyncHandlers {
   applyRemoteState: (state: AppState, serverVersion: number) => void
   onConflict?: (conflict: SyncConflict) => void
+  onUnauthorized?: () => void
   onStatusChange?: (status: SyncStatus) => void
 }
 
@@ -50,9 +52,12 @@ let handlers: SyncHandlers | null = null
 let debounceTimer: number | null = null
 let flushInProgress: Promise<void> | null = null
 let flushRequested = false
+let flushRetryTimer: number | null = null
+let flushRetryDelayMs = 1500
 let hydrationPendingPushVersion: number | null = null
 let conflictRetryTimer: number | null = null
 let conflictRetryDelayMs = 1500
+let conflictRounds = 0
 let initialized = false
 let hydrationPromise: Promise<void> | null = null
 let online = typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -92,6 +97,17 @@ function emitStatus(): void {
   })
 }
 
+function isUnauthorizedError(error: unknown): boolean {
+  const status = (error as { status?: unknown })?.status
+  if (status === 401 || status === 403) return true
+
+  if (error instanceof Error && (error.message === 'unauthorized' || error.message === 'email_not_allowed')) {
+    return true
+  }
+
+  return false
+}
+
 function applySuccessfulRemoteState(state: SyncableState, serverVersion: number): void {
   if (!handlers || !latestState) return
 
@@ -105,6 +121,32 @@ function clearTimer(): void {
     window.clearTimeout(debounceTimer)
     debounceTimer = null
   }
+}
+
+function clearFlushRetryTimer(): void {
+  if (flushRetryTimer !== null) {
+    window.clearTimeout(flushRetryTimer)
+    flushRetryTimer = null
+  }
+}
+
+function scheduleFlushRetry(): void {
+  clearFlushRetryTimer()
+
+  flushRetryTimer = window.setTimeout(() => {
+    flushRetryTimer = null
+    void flush({ waitForHydration: false })
+  }, flushRetryDelayMs)
+
+  flushRetryDelayMs = Math.min(flushRetryDelayMs * 2, 30000)
+}
+
+function notifyUnauthorized(): void {
+  lastError = 'unauthorized'
+  pending = true
+  syncing = false
+  emitStatus()
+  handlers?.onUnauthorized?.()
 }
 
 function clearConflictRetryTimer(): void {
@@ -151,17 +193,20 @@ export function registerSyncHandlers(nextHandlers: SyncHandlers): void {
 
 export function resetSyncEngine(): void {
   clearTimer()
+  clearFlushRetryTimer()
   clearConflictRetryTimer()
   hydrationPromise = null
   flushInProgress = null
   flushRequested = false
+  flushRetryDelayMs = 1500
   hydrationPendingPushVersion = null
+  conflictRetryDelayMs = 1500
+  conflictRounds = 0
   latestState = null
   pending = appStore.getSyncMeta().pendingSync
   syncing = false
   retryingConflict = false
   lastError = null
-  conflictRetryDelayMs = 1500
 
   if (boundOnlineHandler) {
     if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
@@ -203,7 +248,11 @@ export function initializeSync(state: AppState): void {
 
 export function notifyStateChanged(state: AppState): void {
   clearConflictRetryTimer()
+  conflictRetryDelayMs = 1500
   retryingConflict = false
+  clearFlushRetryTimer()
+  flushRetryDelayMs = 1500
+  conflictRounds = 0
   latestState = state
   pending = true
   lastError = null
@@ -263,6 +312,11 @@ async function hydrateFromServer(): Promise<void> {
       }
     }
   } catch (error) {
+    if (isUnauthorizedError(error)) {
+      notifyUnauthorized()
+      return
+    }
+
     lastError = error instanceof Error ? error.message : 'sync_error'
     emitStatus()
   }
@@ -287,6 +341,14 @@ async function retryConflictInBackground(job: ConflictRetryJob): Promise<void> {
   const conflict = await resolveConflictAutomatically(job)
 
   if (conflict) {
+    conflictRounds += 1
+    if (conflictRounds >= 3 && handlers?.onConflict) {
+      retryingConflict = false
+      emitStatus()
+      handlers.onConflict(conflict)
+      return
+    }
+
     conflictRetryDelayMs = Math.min(conflictRetryDelayMs * 2, 30000)
     scheduleConflictRetry({
       desiredState: toSyncableState(conflict.localState),
@@ -295,6 +357,7 @@ async function retryConflictInBackground(job: ConflictRetryJob): Promise<void> {
     return
   }
 
+  conflictRounds = 0
   conflictRetryDelayMs = 1500
   retryingConflict = false
   emitStatus()
@@ -319,9 +382,34 @@ async function resolveConflictAutomatically(job: ConflictRetryJob): Promise<Sync
     lastError = null
     emitStatus()
 
-    const result = await pushState(job.desiredState, currentVersion)
+    let result: PushStateResult
+    try {
+      result = await pushState(job.desiredState, currentVersion)
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        notifyUnauthorized()
+        return null
+      }
+
+      lastError = error instanceof Error ? error.message : 'sync_error'
+      syncing = false
+      emitStatus()
+      scheduleFlushRetry()
+      return null
+    }
 
     if (result.ok) {
+      const currentState = latestState
+      if (currentState && !areSyncableStatesEqual(toSyncableState(currentState), job.desiredState)) {
+        appStore.setSyncMeta({ pendingSync: true, serverVersion: result.version })
+        pending = true
+        syncing = false
+        lastError = null
+        emitStatus()
+        scheduleFlush()
+        return null
+      }
+
       appStore.setSyncMeta({
         pendingSync: false,
         serverVersion: result.version,
@@ -347,9 +435,15 @@ async function resolveConflictAutomatically(job: ConflictRetryJob): Promise<Sync
     }
 
     if (!result.conflict) {
+      if (isUnauthorizedStatus(result.status)) {
+        notifyUnauthorized()
+        return null
+      }
+
       lastError = result.message
       syncing = false
       emitStatus()
+      scheduleFlushRetry()
       return null
     }
 
@@ -366,6 +460,10 @@ async function resolveConflictAutomatically(job: ConflictRetryJob): Promise<Sync
     serverState: latestServerState,
     serverVersion: currentVersion,
   }
+}
+
+function isUnauthorizedStatus(status: number | undefined): boolean {
+  return status === 401 || status === 403
 }
 
 // === Manual Sync Operations ===
@@ -392,9 +490,40 @@ export async function flush(options: { waitForHydration?: boolean } = {}): Promi
       const baseVersion = hydrationPendingPushVersion ?? appStore.getServerVersion() ?? 0
       hydrationPendingPushVersion = null
       const desiredState = toSyncableState(latestState)
-      const result = await pushState(desiredState, baseVersion)
+      let result: PushStateResult
+
+      try {
+        result = await pushState(desiredState, baseVersion)
+      } catch (error) {
+        if (isUnauthorizedError(error)) {
+          notifyUnauthorized()
+          return
+        }
+
+        lastError = error instanceof Error ? error.message : 'sync_error'
+        syncing = false
+        emitStatus()
+        scheduleFlushRetry()
+        return
+      }
 
       if (result.ok) {
+        flushRetryDelayMs = 1500
+        clearFlushRetryTimer()
+        const currentState = latestState
+        const editsDuringPush =
+          currentState && !areSyncableStatesEqual(toSyncableState(currentState), desiredState)
+
+        if (editsDuringPush) {
+          appStore.setSyncMeta({ pendingSync: true, serverVersion: result.version })
+          pending = true
+          syncing = false
+          lastError = null
+          emitStatus()
+          scheduleFlush()
+          return
+        }
+
         applySuccessfulRemoteState(result.state, result.version)
         appStore.setSyncMeta({
           pendingSync: false,
@@ -435,9 +564,15 @@ export async function flush(options: { waitForHydration?: boolean } = {}): Promi
         return
       }
 
+      if (isUnauthorizedStatus(result.status)) {
+        notifyUnauthorized()
+        return
+      }
+
       lastError = result.message
       syncing = false
       emitStatus()
+      scheduleFlushRetry()
     } finally {
       flushInProgress = null
 
