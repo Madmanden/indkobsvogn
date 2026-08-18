@@ -20,7 +20,14 @@ export function ensureDatabaseReady(db: DatabaseLike): Promise<void> {
       await db.exec?.(statement)
     },
     Promise.resolve(),
-  )
+  ).catch((error: unknown) => {
+    bootstrapPromise = null
+    throw error
+  })
 
   return bootstrapPromise
+}
+
+export function resetBootstrapForTests(): void {
+  bootstrapPromise = null
 }
