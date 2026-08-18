@@ -16,6 +16,12 @@ Indkøbsvogn is a Danish, local-first grocery planner that learns your route thr
 - Offline-capable PWA with build-versioned service-worker caches
 - Cloudflare Pages Functions / D1 API source included for reference and deployment from the private canonical repository
 
+## Screenshots
+
+### Store selection
+
+![Indkøbsvogn store selection screen](docs/screenshots/store-selection.jpeg)
+
 ## Public-repository boundary
 
 This repo is meant to be useful for code review, learning and portfolio/reference purposes without publishing production infrastructure metadata.
