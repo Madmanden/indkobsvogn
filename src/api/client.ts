@@ -61,17 +61,52 @@ export interface PushStateError {
 
 export type PushStateResult = PushStateSuccess | PushStateConflict | PushStateError
 
+export class ApiError extends Error {
+  readonly code: string
+  readonly status?: number
+  readonly responseMessage?: string
+  readonly user?: AuthUser
+
+  constructor(
+    code: string,
+    options: { status?: number; responseMessage?: string; user?: AuthUser; message?: string } = {},
+  ) {
+    super(options.message ?? code)
+    this.name = 'ApiError'
+    this.code = code
+    this.status = options.status
+    this.responseMessage = options.responseMessage
+    this.user = options.user
+  }
+}
+
+export function isNetworkError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === 'network_error' || error.code === 'request_timeout')
+  )
+}
+
+export function isAuthError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === 'unauthorized' || error.code === 'email_not_allowed')
+  )
+}
+
 export interface SignInResponse {
   ok: true
   verificationUrl?: string
+  backupCode?: string
+  deliveryStatus: 'sent' | 'local' | 'fallback'
 }
 
 function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`
 }
 
-function createTimeoutError(path: string): Error {
-  return new Error(`request_timeout:${path}`)
+function createTimeoutError(path: string): ApiError {
+  return new ApiError('request_timeout', { message: `request_timeout:${path}` })
 }
 
 async function fetchWithTimeout(path: string, init?: RequestInit): Promise<Response> {
@@ -100,6 +135,10 @@ async function fetchWithTimeout(path: string, init?: RequestInit): Promise<Respo
       throw createTimeoutError(path)
     }
 
+    if (error instanceof TypeError) {
+      throw new ApiError('network_error', { message: `network_error:${path}` })
+    }
+
     throw error
   } finally {
     globalThis.clearTimeout(timeoutId)
@@ -115,13 +154,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const error = await response.json().catch(() => null)
-    const message = typeof error?.error === 'string' ? error.error : response.statusText
-    const apiError = new Error(message) as Error & { responseMessage?: string; status?: number }
-    if (typeof error?.message === 'string') {
-      apiError.responseMessage = error.message
-    }
-    apiError.status = response.status
-    throw apiError
+    const code = typeof error?.error === 'string' ? error.error : response.statusText || 'server_error'
+    throw new ApiError(code, {
+      status: response.status,
+      responseMessage: typeof error?.message === 'string' ? error.message : undefined,
+    })
   }
 
   return readJson<T>(response)
@@ -158,22 +195,6 @@ export async function signIn(email: string): Promise<SignInResponse> {
   })
 }
 
-export async function verifySignIn(token: string): Promise<void> {
-  const response = await requestRaw(`/api/auth/sign-in/verify?token=${encodeURIComponent(token)}`, {
-    method: 'GET',
-    redirect: 'follow',
-  })
-
-  if (!response.ok && response.status !== 200) {
-    const error = (await response.json().catch(() => null)) as { error?: string } | null
-    if (error?.error === 'email_not_allowed') {
-      throw new Error('email_not_allowed')
-    }
-
-    throw new Error('invalid_token')
-  }
-}
-
 export async function verifySignInCode(email: string, code: string): Promise<void> {
   const response = await requestRaw('/api/auth/sign-in/verify-code', {
     method: 'POST',
@@ -182,7 +203,7 @@ export async function verifySignInCode(email: string, code: string): Promise<voi
 
   if (!response.ok) {
     const error = (await response.json().catch(() => null)) as { error?: string } | null
-    throw new Error(error?.error ?? 'invalid_code')
+    throw new ApiError(error?.error ?? 'invalid_code', { status: response.status })
   }
 }
 
@@ -195,22 +216,20 @@ export async function getHouseholdMe(): Promise<HouseholdMeResponse> {
 
   if (response.status === 404) {
     const payload = (await response.json().catch(() => null)) as { user?: AuthUser } | null
-    const error = new Error('no_household') as Error & { user?: AuthUser }
-    error.user = payload?.user
-    throw error
+    throw new ApiError('no_household', { status: 404, user: payload?.user })
   }
 
   if (response.status === 401 || response.status === 403) {
     const payload = (await response.json().catch(() => null)) as { error?: string } | null
     if (payload?.error === 'email_not_allowed') {
-      throw new Error('email_not_allowed')
+      throw new ApiError('email_not_allowed', { status: response.status })
     }
 
-    throw new Error('unauthorized')
+    throw new ApiError('unauthorized', { status: response.status })
   }
 
   if (!response.ok) {
-    throw new Error(response.statusText)
+    throw new ApiError('server_error', { status: response.status })
   }
 
   return readJson<HouseholdMeResponse>(response)
