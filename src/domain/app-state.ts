@@ -1,4 +1,4 @@
-import { createSyntheticTrip, recalculateWeightedPositions } from './learning'
+import { recalculateWeightedPositions } from './learning'
 import type { AppState, ListItem, Trip } from './models'
 import { appendTripCapped } from './trips'
 import { createId } from '../utils/id'
@@ -18,32 +18,9 @@ function getSelectedStoreManualItemIds(state: AppState): string[] {
     .map((li) => li.itemId)
 }
 
-function recordManualOrderLearning(state: AppState, now: number): AppState {
-  const manualItemIds = getSelectedStoreManualItemIds(state)
-  if (manualItemIds.length === 0) return state
-
-  const trips = appendTripCapped(
-    state.trips,
-    createSyntheticTrip(manualItemIds, state.selectedStoreId, now),
-  )
-
-  return persistWeightedPositions({ ...state, trips }, now)
-}
-
-function learnManualOrder(state: AppState, now: number): AppState {
-  const withLearning = recordManualOrderLearning(state, now)
-
-  return {
-    ...withLearning,
-    sortMode: 'learned',
-    list: withLearning.list.map((li) => clearManualPosition(li)),
-  }
-}
-
 export function switchSortMode(
   state: AppState,
   mode: 'learned' | 'manual',
-  now = Date.now(),
 ): AppState {
   if (mode === state.sortMode) return state
 
@@ -63,16 +40,11 @@ export function switchSortMode(
     }
   }
 
-  const storeList = state.list.filter((li) => li.storeId === state.selectedStoreId)
-  const manuallyOrdered = storeList
-    .filter((li) => li.manualPosition >= 0)
-    .sort((a, b) => a.manualPosition - b.manualPosition)
-
-  if (manuallyOrdered.length > 0) {
-    return learnManualOrder(state, now)
+  return {
+    ...state,
+    sortMode: 'learned',
+    list: state.list.map((li) => clearManualPosition(li)),
   }
-
-  return { ...state, sortMode: 'learned' }
 }
 
 export function persistWeightedPositions(state: AppState, now = Date.now()): AppState {
@@ -109,11 +81,11 @@ export function reorderList(state: AppState, orderedItemIds: string[]): AppState
   }
 }
 
-export function startTrip(state: AppState, now = Date.now()): AppState {
+export function startTrip(state: AppState): AppState {
   const hasManualOrder = getSelectedStoreManualItemIds(state).length > 0
   const prepared: AppState = hasManualOrder
     ? {
-        ...recordManualOrderLearning(state, now),
+        ...state,
         sortMode: 'manual',
       }
     : {
