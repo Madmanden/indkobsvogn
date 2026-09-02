@@ -8,6 +8,7 @@ import {
 } from '../src/domain/app-state'
 import { UNLEARNED_POSITION } from '../src/domain/learning'
 import type { AppState, Trip } from '../src/domain/models'
+import { getPlanningRows } from '../src/utils/list'
 
 function makeState(trips: Trip[] = []): AppState {
   return {
@@ -141,7 +142,7 @@ describe('startTrip', () => {
     expect(started.list).toEqual(state.list)
   })
 
-  it('records the manual order as a trip so future sortings learn from it', () => {
+  it('learns from the manual order while preserving it for the current shopping trip', () => {
     const state = reorderList(
       { ...makeState(), isShopping: false, currentSequence: [] },
       ['item-b', 'item-a'],
@@ -151,13 +152,15 @@ describe('startTrip', () => {
 
     expect(started.isShopping).toBe(true)
     expect(started.trips).toHaveLength(1)
-    expect(started.sortMode).toBe('learned')
+    expect(started.sortMode).toBe('manual')
     expect(started.trips[0]?.storeId).toBe('store-1')
     expect(started.trips[0]?.completedAt).toBe(1000)
     expect(started.trips[0]?.sequence).toEqual(['item-b', 'item-a'])
-    expect(started.list.every((entry) => entry.manualPosition === -1)).toBe(true)
+    expect(started.list.find((entry) => entry.itemId === 'item-b')?.manualPosition).toBe(0)
+    expect(started.list.find((entry) => entry.itemId === 'item-a')?.manualPosition).toBe(1)
     expect(started.list.find((entry) => entry.itemId === 'item-b')?.weightedPosition).toBe(0)
     expect(started.list.find((entry) => entry.itemId === 'item-a')?.weightedPosition).toBe(1)
+    expect(getPlanningRows(started).map((row) => row.id)).toEqual(['item-b', 'item-a'])
   })
 
   it('only records items for the selected store in the manual-order trip', () => {
