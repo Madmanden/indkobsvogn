@@ -18,22 +18,23 @@ function getSelectedStoreManualItemIds(state: AppState): string[] {
     .map((li) => li.itemId)
 }
 
-function learnManualOrder(state: AppState, now: number): AppState {
+function recordManualOrderLearning(state: AppState, now: number): AppState {
   const manualItemIds = getSelectedStoreManualItemIds(state)
-  const trips =
-    manualItemIds.length > 0
-      ? appendTripCapped(
-          state.trips,
-          createSyntheticTrip(manualItemIds, state.selectedStoreId, now),
-        )
-      : state.trips
+  if (manualItemIds.length === 0) return state
 
-  const withLearning =
-    manualItemIds.length > 0 ? persistWeightedPositions({ ...state, trips }, now) : state
+  const trips = appendTripCapped(
+    state.trips,
+    createSyntheticTrip(manualItemIds, state.selectedStoreId, now),
+  )
+
+  return persistWeightedPositions({ ...state, trips }, now)
+}
+
+function learnManualOrder(state: AppState, now: number): AppState {
+  const withLearning = recordManualOrderLearning(state, now)
 
   return {
     ...withLearning,
-    trips,
     sortMode: 'learned',
     list: withLearning.list.map((li) => clearManualPosition(li)),
   }
@@ -109,11 +110,17 @@ export function reorderList(state: AppState, orderedItemIds: string[]): AppState
 }
 
 export function startTrip(state: AppState, now = Date.now()): AppState {
-  const prepared = getSelectedStoreManualItemIds(state).length > 0 ? learnManualOrder(state, now) : {
-    ...state,
-    sortMode: 'learned' as const,
-    list: state.list.map((li) => clearManualPosition(li)),
-  }
+  const hasManualOrder = getSelectedStoreManualItemIds(state).length > 0
+  const prepared: AppState = hasManualOrder
+    ? {
+        ...recordManualOrderLearning(state, now),
+        sortMode: 'manual',
+      }
+    : {
+        ...state,
+        sortMode: 'learned',
+        list: state.list.map((li) => clearManualPosition(li)),
+      }
 
   return {
     ...prepared,
